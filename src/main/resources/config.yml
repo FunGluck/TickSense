@@ -1,0 +1,6 @@
+collection:
+  enabled: true
+  interval-ticks: 200
+storage:
+  directory: data
+  queue-capacity: 1024
