@@ -3,3 +3,17 @@ build/
 .idea/
 *.iml
 .vscode/
+
+# Python environments and bytecode
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Local metrics, logs and datasets
+*.csv
+*.log
+*.log.*
+logs/
+datasets/*
+!datasets/.gitkeep
