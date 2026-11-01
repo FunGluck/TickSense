@@ -41,4 +41,10 @@ storage:
 
 ## Python-анализ
 
-В `analysis/` подготовлена заготовка будущего анализатора с зависимостями pandas и matplotlib. Сейчас она только принимает путь к CSV через командную строку; загрузка данных, графики и ML не реализованы. Инструкция настройки окружения и запуска: [analysis/README.md](analysis/README.md). Локальные данные храните в `datasets/`, содержимое которого исключено из Git.
+В `analysis/` реализован MVP анализа: статистический порог и Isolation Forest, обучаемый только на обучающем CSV. Для проверочного CSV формируются сводка, сравнение детекторов, топ-10 по anomaly score и график. Можно сохранить JSON/PNG без открытия окна:
+
+```powershell
+python analysis/analyze.py datasets/metrics-2026-10-31.csv datasets/metrics-2026-11-01.csv --json datasets/report.json --png datasets/report.png --no-show
+```
+
+Настройка окружения, ограничения и тесты: [analysis/README.md](analysis/README.md). Локальные данные и отчёты храните в исключённом из Git `datasets/`.
