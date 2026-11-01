@@ -28,15 +28,29 @@ public final class TickSensePlugin extends JavaPlugin {
         worker.setDaemon(true);
         worker.start();
         var memory = ManagementFactory.getMemoryMXBean();
+        var collectors = ManagementFactory.getGarbageCollectorMXBeans();
         task = getServer().getScheduler().runTaskTimer(this, () -> {
             Session current = session;
             if (current == null || stopping) return;
             if (++ticks < current.interval()) return;
             ticks = 0;
+            long loadedChunks = 0;
+            long entitiesTotal = 0;
+            long blockEntitiesTotal = 0;
+            // Only world-level counts: no entity/chunk enumeration or chunk loading.
+            for (var world : getServer().getWorlds()) {
+                loadedChunks += world.getChunkCount();
+                entitiesTotal += world.getEntityCount();
+                blockEntitiesTotal += world.getTileEntityCount();
+            }
+            var heap = memory.getHeapMemoryUsage();
+            var gc = GcMetrics.read(collectors);
             current.queue().offer(new MetricSnapshot(Instant.now(),
                     (System.nanoTime() - current.startNanos()) / 1_000_000,
                     getServer().getTPS()[0], getServer().getAverageTickTime(),
-                    getServer().getOnlinePlayers().size(), memory.getHeapMemoryUsage().getUsed()));
+                    getServer().getOnlinePlayers().size(), heap.getUsed(),
+                    loadedChunks, entitiesTotal, blockEntitiesTotal, heap.getCommitted(),
+                    gc.collectionCount(), gc.collectionTimeMs()));
         }, 1L, 1L);
     }
 

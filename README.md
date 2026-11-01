@@ -11,13 +11,13 @@
 ```
 
 Linux/macOS: `sh ./gradlew clean test build`.
-Результат: `build/libs/TickSense-0.1.0.jar`.
+Результат: `build/libs/TickSense-0.2.0.jar`.
 
 ## Установка
 
 1. Скопируйте JAR в `plugins/` существующего Paper 1.21.4 сервера с Java 21.
 2. Запустите сервер. Плагин создаст `plugins/TickSense/config.yml` в фоновом потоке.
-3. CSV появится после первого интервала в `plugins/TickSense/data/metrics-YYYY-MM-DD.csv`.
+3. CSV появится после первого интервала в `plugins/TickSense/data/metrics-v2-YYYY-MM-DD.csv`.
 4. Для изменения конфигурации остановите сервер, измените YAML и запустите его снова.
 
 Параметры по умолчанию:
@@ -48,3 +48,4 @@ python analysis/analyze.py datasets/metrics-2026-10-31.csv datasets/metrics-2026
 ```
 
 Настройка окружения, ограничения и тесты: [analysis/README.md](analysis/README.md). Локальные данные и отчёты храните в исключённом из Git `datasets/`.
+

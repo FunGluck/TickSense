@@ -21,8 +21,15 @@ final class DailyCsvWriter implements AutoCloseable {
         if (!nextDay.equals(day)) {
             close();
             Files.createDirectories(directory);
-            Path file = directory.resolve("metrics-" + nextDay + ".csv");
+            Path file = directory.resolve("metrics-v2-" + nextDay + ".csv");
             boolean empty = !Files.exists(file) || Files.size(file) == 0;
+            if (!empty) {
+                try (var reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+                    if (!MetricSnapshot.HEADER.equals(reader.readLine())) {
+                        throw new IOException("Incompatible CSV header: " + file);
+                    }
+                }
+            }
             writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);
             day = nextDay;
