@@ -10,7 +10,7 @@ from sklearn.ensemble import IsolationForest
 
 
 WINDOW = 6
-FEATURES = ["mspt_avg", "players_online"]
+FEATURES = ["mspt_avg", "players_online", "tps_1m"]
 
 
 def prepare_data(csv_path: Path) -> pd.DataFrame:
@@ -141,15 +141,21 @@ def main() -> None:
     # max_mspt_index = test_df["mspt_avg"].idxmax() # макс мспт по всей таблице
 
     print(
-        test_df[test_df["ml_anomaly"]]
-        [["timestamp_utc", "mspt_avg", "players_online", "anomaly_score"]]
-        .sort_values("anomaly_score")
-        .to_string(index=False)
+        test_df[test_df["ml_anomaly"]][
+            [
+                "timestamp_utc",
+                "mspt_avg",
+                "tps_1m",
+                "players_online",
+                "anomaly_score",
+            ]
+        ].sort_values("anomaly_score").to_string(index=False)
     )
+    print(df["tps_1m"].describe())
     # print(f"Самый низкий anomaly score: {smallest_score}")
     # print(max_mspt_index in smallest_score.index) # ищем среди аномалий макс мспт
-    # print(f'Число AFK-измерений: {len(test_df)}')
-    # print(f'Число найденных AFK-аномалий: {test_df["ml_anomaly"].sum()}')
+    print(f'Число AFK-измерений: {len(test_df)}')
+    print(f'Число найденных AFK-аномалий: {test_df["ml_anomaly"].sum()}')
     print(f"Сессий: {df['session_id'].nunique()}")
     print(f"Оба детектора: {len(both)}")
     print(f"Только статистика: {len(only_stat)}")
