@@ -13,12 +13,36 @@ def main() -> None:
 
     df = pd.read_csv(args.csv_path)
     df["timestamp_utc"] = pd.to_datetime(df["timestamp_utc"], utc=True)
-    df["rolling_mean"] = df["mspt_avg"].shift(1).rolling(window=6).mean()
-    df["rolling_std"] = df["mspt_avg"].shift(1).rolling(window=6).std()
+    df["session_id"] = (df["elapsed_ms"].diff() < 0).cumsum() + 1
+    # При перезапуске сервера разница между elapsed_ms становится отрицательной. Фиксируем данный момент и указываем,
+    # что началась другая сессия
+
+    # session_nums = df.groupby("session_id")["mspt_avg"].agg(["count", "mean", "max"])
+
+    # Сгруппируй строки по session_id, выбери столбец mspt_avg. Вычисли количество измерений,
+    # средний и максимальный MSPT для каждой сессии
+
+    df["rolling_mean"] = (
+        df.groupby("session_id")["mspt_avg"]
+        .transform(lambda s: s.shift(1).rolling(window=6).mean())
+    )
+    df["rolling_std"] = (
+        df.groupby("session_id")["mspt_avg"]
+        .transform(lambda s: s.shift(1).rolling(window=6).std())
+    )
+    # шифт чтобы действующее значение не участвовало в измерении и резкий скачок учитывался за аномалию
     df["rolling_threshold"] = df["rolling_mean"] + 3 * df["rolling_std"]
+    df["excess_mspt"] = df["mspt_avg"] - df["rolling_threshold"]
+    # excess_mspt - то, насколько сильно mspt отклонился от динамического порога
 
     dynamic_anomalies = df[df["mspt_avg"] > df["rolling_threshold"]]
-    # шифт чтобы действующее значение не участвовало в измерении и резкий скачок учитывался за аномалию
+    df["online_changed"] = (
+            df["players_online"] != df["players_online"].shift(1).fillna(df["players_online"])
+    )
+
+    print(dynamic_anomalies[df["online_changed"] == True])
+    # .size() возвращает количество строк в каждой группе.
+
     plt.plot(
         df["timestamp_utc"],
         df["mspt_avg"],
@@ -45,28 +69,6 @@ def main() -> None:
     plt.grid(True, alpha=0.3)
     plt.legend()
 
-    active_df = df[df["players_online"] > 0]
-    empty_df = df[df["players_online"] == 0]
-    empty_threshold = empty_df["mspt_avg"].mean() + 3 * empty_df["mspt_avg"].std()
-    active_threshold = active_df["mspt_avg"].mean() + 3 * active_df["mspt_avg"].std()
-
-    # empty_anomalies = empty_df[empty_df["mspt_avg"] > empty_threshold]
-    # active_anomalies = active_df[active_df["mspt_avg"] > active_threshold]
-
-    # plt.scatter(
-    #     empty_anomalies["timestamp_utc"],
-    #     empty_anomalies["mspt_avg"],
-    #     color="orange",
-    #     label=f"MSPT > {empty_threshold:.2f} мс",
-    #     zorder=3
-    # )
-    # plt.scatter(
-    #     active_anomalies["timestamp_utc"],
-    #     active_anomalies["mspt_avg"],
-    #     color="red",
-    #     label=f"MSPT > {active_threshold:.2f} мс",
-    #     zorder=3
-    # )
     plt.scatter(
         dynamic_anomalies["timestamp_utc"],
         dynamic_anomalies["mspt_avg"],
@@ -76,7 +78,7 @@ def main() -> None:
     )
 
     df["previous_online"] = df["players_online"].shift(1).fillna(0)
-    joins_df = df[(df["previous_online"] == 0) & (df["players_online"] > 0)] # подключения
+    joins_df = df[(df["previous_online"] == 0) & (df["players_online"] > 0)]  # подключения
     leaves_df = df[(df["previous_online"] > 0) & (df["players_online"] == 0)]
 
     for timestamp in joins_df["timestamp_utc"]:
@@ -84,12 +86,8 @@ def main() -> None:
     for timestamp in leaves_df["timestamp_utc"]:
         plt.axvline(timestamp, color="red", linestyle="--", label="Отключение")
 
-    # .iloc[0] чтобы взять первую СТРОКУ
-
-    plt.legend()
+    # .iloc[0], чтобы взять первую СТРОКУ
     plt.show()
-
-    print(len(dynamic_anomalies))
 
 
 if __name__ == "__main__":
