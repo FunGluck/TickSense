@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.ByteBuffer;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 
@@ -24,6 +25,14 @@ final class DailyCsvWriter implements AutoCloseable {
             Path file = directory.resolve("metrics-v2-" + nextDay + ".csv");
             boolean empty = !Files.exists(file) || Files.size(file) == 0;
             if (!empty) {
+                // Do not join a new record onto an interrupted write after a crash.
+                try (var channel = Files.newByteChannel(file, StandardOpenOption.READ)) {
+                    channel.position(channel.size() - 1);
+                    var tail = ByteBuffer.allocate(1);
+                    if (channel.read(tail) != 1 || tail.array()[0] != '\n') {
+                        throw new IOException("Incomplete CSV tail; preserve and inspect file: " + file);
+                    }
+                }
                 try (var reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
                     if (!MetricSnapshot.HEADER.equals(reader.readLine())) {
                         throw new IOException("Incompatible CSV header: " + file);

@@ -1,5 +1,5 @@
 name: TickSense
-version: '0.2.0'
+version: '${version}'
 main: dev.ticksense.TickSensePlugin
 api-version: '1.21.4'
-description: Local performance metrics collector
+description: Experimental Pilot - local performance metrics collector

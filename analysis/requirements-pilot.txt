@@ -1,0 +1,5 @@
+# Tested analysis stack for the Pilot; no change to the model algorithms.
+# This pins direct dependencies; transitive dependencies and OS wheels can differ.
+pandas==2.3.3
+matplotlib==3.10.9
+scikit-learn==1.7.2

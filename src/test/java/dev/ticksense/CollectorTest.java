@@ -89,5 +89,24 @@ class CollectorTest {
         }
         assertEquals("wrong,header\n", Files.readString(file));
     }
+
+    @Test void incompleteTailIsRejectedWithoutChangingFile() throws Exception {
+        Path file = directory.resolve("metrics-v2-2026-10-31.csv");
+        String original = MetricSnapshot.HEADER + "\n2026-10-31T12:00:00Z,123";
+        Files.writeString(file, original);
+        try (var csv = new DailyCsvWriter(directory)) {
+            assertThrows(java.io.IOException.class, () -> csv.write(snapshot("2026-10-31T12:00:00Z")));
+        }
+        assertEquals(original, Files.readString(file));
+    }
+
+    @Test void filesystemFailureIsPropagated() throws Exception {
+        Path notDirectory = directory.resolve("blocked");
+        Files.writeString(notDirectory, "keep");
+        try (var csv = new DailyCsvWriter(notDirectory)) {
+            assertThrows(java.io.IOException.class, () -> csv.write(snapshot("2026-10-31T12:00:00Z")));
+        }
+        assertEquals("keep", Files.readString(notDirectory));
+    }
 }
 

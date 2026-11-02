@@ -22,6 +22,7 @@ public final class TickSensePlugin extends JavaPlugin {
 
     @Override public void onEnable() {
         stopping = false;
+        ticks = 0;
         Path folder = getDataFolder().toPath().toAbsolutePath().normalize();
         Logger logger = getLogger();
         worker = new Thread(() -> collectToDisk(folder, logger), "TickSense-CSV");

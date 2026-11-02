@@ -17,3 +17,18 @@ __pycache__/
 logs/
 datasets/*
 !datasets/.gitkeep
+
+# Local reports, release artifacts and credentials
+reports/
+dist/
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+.env
+.env.*
+*.pem
+*.key
+!.env.example
+/report.json
+/report.html
+/report.png
+.pytest_cache/

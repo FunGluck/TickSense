@@ -1,6 +1,6 @@
 plugins { java }
 group = "dev.ticksense"
-version = "0.2.0"
+version = "0.8.0-pilot"
 repositories {
     mavenCentral()
     maven("https://repo.papermc.io/repository/maven-public/")
@@ -14,3 +14,11 @@ dependencies {
 java { toolchain.languageVersion.set(JavaLanguageVersion.of(21)) }
 tasks.withType<JavaCompile>().configureEach { options.encoding = "UTF-8" }
 tasks.test { useJUnitPlatform() }
+tasks.processResources {
+    inputs.property("version", project.version)
+    filesMatching("plugin.yml") { expand("version" to project.version) }
+}
+tasks.withType<AbstractArchiveTask>().configureEach {
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
