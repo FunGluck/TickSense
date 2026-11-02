@@ -18,18 +18,21 @@ const data=JSON.parse(document.getElementById('report-data').textContent);
 const $=id=>document.getElementById(id), num=(n,d=2)=>n===null||n===undefined||!Number.isFinite(Number(n))?'—':new Intl.NumberFormat('ru-RU',{maximumFractionDigits:d}).format(n);
 const plural=(n,forms)=>forms[(n%100>=11&&n%100<=14)?2:(n%10===1?0:(n%10>=2&&n%10<=4?1:2))];
 const measurements=n=>`${num(n,0)} ${plural(n,['измерение','измерения','измерений'])}`;
-const date=t=>t?new Intl.DateTimeFormat('ru-RU',{timeZone:'UTC',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date(t))+' UTC':'—';
+const date=t=>t!==null&&t!==undefined?new Intl.DateTimeFormat('ru-RU',{timeZone:'UTC',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',fractionalSecondDigits:3}).format(new Date(t))+' UTC':'—';
 const text=value=>String(value??'').replace(/(\d)\.(\d)/g,'$1,$2');
 function el(tag,content,parent,cls){const n=document.createElement(tag);if(content!==undefined)n.textContent=content;if(cls)n.className=cls;if(parent)parent.append(n);return n;}
 const sessions=[...new Set(data.points.map(p=>String(p.session_id)))];
 sessions.forEach(s=>{const o=el('option',`${RU.session} ${s}`,$('session'));o.value=s;});
-let points=[],events=[],lo=0,hi=1,fullLo=0,fullHi=1,mlLimit=50;
+let points=[],events=[],lo=0,hi=1,fullLo=0,fullHi=1,mlLimit=50,navigationEnabled=false,drag=null;
+const CANVAS_FONT='13px Inter, "Segoe UI", Arial, sans-serif';
 const time=p=>Date.parse(p.timestamp_utc), belongs=x=>$('session').value==='all'||String(x.session_id)===$('session').value;
 function refresh(){
+  finishDrag();
   points=data.points.filter(belongs);events=data.events.filter(belongs);mlLimit=50;
   const times=points.map(time).filter(Number.isFinite);fullLo=times.length?Math.min(...times):0;fullHi=times.length?Math.max(...times):1;
+  navigationEnabled=times.length>1&&fullHi>fullLo;
+  // Axis padding for a single timestamp only; not an observed duration.
   if(fullHi===fullLo){fullLo-=500;fullHi+=500;}lo=fullLo;hi=fullHi;
-  $('from').value=0;$('to').value=1000;
   const values=points.map(p=>p.mspt_avg).filter(v=>v!==null&&Number.isFinite(v)),tps=points.map(p=>p.tps_1m).filter(v=>v!==null&&Number.isFinite(v));
   const cards=[[RU.measurements,num(points.length,0)],[RU.sessions,num(new Set(points.map(p=>p.session_id)).size,0)],
     [RU.mean,values.length?num(values.reduce((a,b)=>a+b,0)/values.length)+' мс':'—'],[RU.peak,values.length?num(Math.max(...values))+' мс':'—'],
@@ -82,7 +85,7 @@ function draw(id,key){
   const rows=points.filter(p=>time(p)>=lo&&time(p)<=hi),valid=rows.filter(p=>p[key]!==null&&Number.isFinite(p[key]));
   const min=0,max=valid.length?Math.max(key==='tps_1m'?20:1,...valid.map(p=>p[key]))*1.1:1;
   const x=t=>52+(t-lo)/(hi-lo)*(w-70),y=v=>h-36-(v-min)/(max-min)*(h-55);
-  c.font='11px system-ui';c.strokeStyle='#283246';c.fillStyle='#9baac0';
+  c.font=CANVAS_FONT;c.strokeStyle='#283246';c.fillStyle='#9baac0';
   for(let i=0;i<=4;i++){const v=max*i/4;c.beginPath();c.moveTo(52,y(v));c.lineTo(w-18,y(v));c.stroke();c.fillText(num(v,1),5,y(v)+4);}
   for(let i=0;i<3;i++){const t=lo+(hi-lo)*i/2,label=new Date(t).toLocaleTimeString('ru-RU',{timeZone:'UTC'});c.fillText(label,Math.min(w-70,Math.max(52,x(t)-25)),h-10);}
   // A change of session/file, missing value or backward timestamp breaks the path.
@@ -100,11 +103,75 @@ function draw(id,key){
   if(!valid.length)c.fillText(RU.noData,60,h/2);
   plotInfo[id]={rows:valid,x,y,width:w};
 }
-function drawAll(){draw('mspt','mspt_avg');draw('tps','tps_1m');$('period').textContent=`${date(lo)} — ${date(hi)}`;$('tooltip').hidden=true;}
-function setRange(){let a=Number($('from').value),b=Number($('to').value);if(a>=b){a=Math.min(a,999);b=a+1;$('from').value=a;$('to').value=b;}lo=fullLo+(fullHi-fullLo)*a/1000;hi=fullLo+(fullHi-fullLo)*b/1000;drawAll();}
+function drawAll(){draw('mspt','mspt_avg');draw('tps','tps_1m');drawNavigator();$('period').textContent=points.length?`${date(lo)} — ${date(hi)}`:RU.noData;$('tooltip').hidden=true;}
+const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
+// Keep the handles distinguishable even on a narrow navigator (at least 24 CSS px).
+const minWindow=()=>Math.min(fullHi-fullLo,Math.max(1,Math.ceil((fullHi-fullLo)*24/navigatorGeometry().width)));
+// All input methods share these bounds and the same lo/hi for both plots.
+function changeWindow(mode,delta,startLo=lo,startHi=hi){
+  if(!navigationEnabled)return;
+  if(mode==='left'){hi=startHi;lo=clamp(startLo+delta,fullLo,hi-minWindow());}
+  else if(mode==='right'){lo=startLo;hi=clamp(startHi+delta,lo+minWindow(),fullHi);}
+  else{const span=startHi-startLo;lo=clamp(startLo+delta,fullLo,fullHi-span);hi=lo+span;}
+  drawAll();
+}
+function resetWindow(){finishDrag();lo=fullLo;hi=fullHi;drawAll();}
+function navigatorGeometry(){const w=$('navigator').getBoundingClientRect().width;return {left:24,width:Math.max(1,w-48)};}
+function navX(t){const g=navigatorGeometry();return g.left+(t-fullLo)/(fullHi-fullLo)*g.width;}
+function navMode(x){const left=navX(lo),right=navX(hi),hit=14;
+  if(Math.min(Math.abs(x-left),Math.abs(x-right))<=hit)return Math.abs(x-left)<=Math.abs(x-right)?'left':'right';
+  return x>left&&x<right?'pan':null;
+}
+function drawNavigator(){
+  const canvas=$('navigator'),r=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+  canvas.width=r.width*dpr;canvas.height=r.height*dpr;const c=canvas.getContext('2d');c.scale(dpr,dpr);c.font=CANVAS_FONT;
+  const bottom=r.height-24,valid=points.filter(p=>p.mspt_avg!==null&&Number.isFinite(p.mspt_avg)&&Number.isFinite(time(p)));
+  const max=valid.reduce((v,p)=>Math.max(v,p.mspt_avg),1),y=v=>bottom-v/max*(bottom-12);
+  c.strokeStyle='#7faeff';c.lineWidth=1.5;c.beginPath();let previous=null;
+  points.forEach(p=>{if(p.mspt_avg===null||!Number.isFinite(p.mspt_avg)||!Number.isFinite(time(p))){previous=null;return;}
+    if(!previous||p.session_id!==previous.session_id||p.source_file!==previous.source_file||time(p)<time(previous))c.moveTo(navX(time(p)),y(p.mspt_avg));
+    else c.lineTo(navX(time(p)),y(p.mspt_avg));previous=p;});c.stroke();
+  const left=navX(lo),right=navX(hi),g=navigatorGeometry();
+  c.fillStyle='#050a13b3';c.fillRect(g.left,0,Math.max(0,left-g.left),bottom);c.fillRect(right,0,Math.max(0,g.left+g.width-right),bottom);
+  c.fillStyle='#77e1bb20';c.fillRect(left,0,right-left,bottom);c.strokeStyle='#77e1bb';c.strokeRect(left,1,right-left,bottom-2);
+  for(const x of [left,right]){c.fillStyle='#77e1bb';c.fillRect(x-5,bottom/2-18,10,36);c.fillStyle='#10251f';c.fillRect(x-1,bottom/2-7,2,14);}
+  const axisTime=t=>new Date(t).toLocaleTimeString('ru-RU',{timeZone:'UTC'})+' UTC';
+  c.fillStyle='#9baac0';c.textAlign='left';c.fillText(points.length?axisTime(fullLo):RU.noData,g.left,r.height-4);
+  if(navigationEnabled){c.textAlign='right';c.fillText(axisTime(fullHi),g.left+g.width,r.height-4);}
+  for(const id of ['nav-left','nav-pan','nav-right'])$(id).disabled=!navigationEnabled;
+  $('reset').disabled=!navigationEnabled;
+  $('nav-status').textContent=navigationEnabled?`Выбрано: ${date(lo)} — ${date(hi)}`:points.length?'Одно время наблюдения: изменение диапазона недоступно. Отступы оси не означают длительность события.':RU.noData;
+  $('nav-left').setAttribute('aria-label',`Начало диапазона: ${date(lo)}. Изменить стрелками.`);
+  $('nav-right').setAttribute('aria-label',`Конец диапазона: ${date(hi)}. Изменить стрелками.`);
+}
+function finishDrag(){if(!drag)return;const old=drag;drag=null;old.canvas.style.cursor='';if(old.canvas.hasPointerCapture(old.id))old.canvas.releasePointerCapture(old.id);}
+function bindDrag(canvas,isNavigator){
+  canvas.addEventListener('pointerdown',e=>{
+    if(!navigationEnabled||drag||e.isPrimary===false||(e.button!==undefined&&e.button!==0))return;
+    const r=canvas.getBoundingClientRect(),mode=isNavigator?navMode(e.clientX-r.left):'pan';if(!mode)return;
+    e.preventDefault();canvas.setPointerCapture(e.pointerId);
+    drag={canvas,id:e.pointerId,mode,x:e.clientX,startLo:lo,startHi:hi,
+      timePerPixel:isNavigator?(fullHi-fullLo)/navigatorGeometry().width:(hi-lo)/Math.max(1,r.width-70),isNavigator};
+    canvas.style.cursor=mode==='pan'?'grabbing':'ew-resize';$('tooltip').hidden=true;
+  });
+  canvas.addEventListener('pointermove',e=>{
+    if(drag&&drag.canvas===canvas&&drag.id===e.pointerId){e.preventDefault();const delta=(e.clientX-drag.x)*drag.timePerPixel*(isNavigator?1:-1);changeWindow(drag.mode,delta,drag.startLo,drag.startHi);}
+    else if(!drag&&isNavigator){const mode=navMode(e.clientX-canvas.getBoundingClientRect().left);canvas.style.cursor=!navigationEnabled?'default':mode==='pan'?'grab':mode?'ew-resize':'default';}
+  });
+  for(const event of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(event,e=>{if(drag&&drag.canvas===canvas&&drag.id===e.pointerId)finishDrag();});
+}
+bindDrag($('navigator'),true);
+for(const [id,mode] of [['nav-left','left'],['nav-pan','pan'],['nav-right','right']])$(id).addEventListener('keydown',e=>{
+  if(!navigationEnabled||!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();
+  let delta=(fullHi-fullLo)/100*(e.shiftKey?10:1)*(e.key==='ArrowLeft'?-1:1);
+  if(e.key==='Home')delta=fullLo-(mode==='right'?hi:lo);
+  if(e.key==='End')delta=fullHi-(mode==='right'?hi:mode==='left'?lo:hi);
+  changeWindow(mode,delta);
+});
 ['mspt','tps'].forEach(id=>{
   const canvas=$(id);
   function inspect(e){const info=plotInfo[id],r=canvas.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;
+    if(drag)return;
     const nearest=info.rows.reduce((best,p)=>{const distance=Math.hypot(info.x(time(p))-px,info.y(p[id==='mspt'?'mspt_avg':'tps_1m'])-py);return !best||distance<best.distance?{p,distance}:best;},null);
     if(!nearest){$('tooltip').hidden=true;return;}
     const p=nearest.p,signals=events.filter(v=>v.session_id===p.session_id&&v.source_file===p.source_file&&v.source_rows.includes(p.csv_row)).map(v=>RU[v.signal]);
@@ -112,10 +179,12 @@ function setRange(){let a=Number($('from').value),b=Number($('to').value);if(a>=
     $('tooltip').hidden=false;$('tooltip').style.left=Math.max(8,Math.min(e.clientX+16,window.innerWidth-370))+'px';$('tooltip').style.top=Math.max(8,Math.min(e.clientY+16,window.innerHeight-$('tooltip').offsetHeight-8))+'px';
   }
   canvas.addEventListener('pointermove',inspect);canvas.addEventListener('click',inspect);canvas.addEventListener('pointerleave',()=>$('tooltip').hidden=true);
-  canvas.addEventListener('wheel',e=>{e.preventDefault();const r=canvas.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,(e.clientX-r.left-52)/(r.width-70))),center=lo+(hi-lo)*fraction,span=Math.max(100,Math.min(fullHi-fullLo,(hi-lo)*(e.deltaY>0?1.3:0.75)));
-    lo=Math.max(fullLo,Math.min(fullHi-span,center-span*fraction));hi=lo+span;$('from').value=(lo-fullLo)/(fullHi-fullLo)*1000;$('to').value=(hi-fullLo)/(fullHi-fullLo)*1000;drawAll();},{passive:false});
+  bindDrag(canvas,false);
+  canvas.addEventListener('wheel',e=>{e.preventDefault();const r=canvas.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,(e.clientX-r.left-52)/(r.width-70))),center=lo+(hi-lo)*fraction,span=(hi-lo)*(e.deltaY>0?1.3:0.75);
+    if(!navigationEnabled)return;finishDrag();const boundedSpan=clamp(span,minWindow(),fullHi-fullLo);
+    lo=clamp(center-boundedSpan*fraction,fullLo,fullHi-boundedSpan);hi=lo+boundedSpan;drawAll();},{passive:false});
 });
-$('session').addEventListener('change',refresh);$('from').addEventListener('input',setRange);$('to').addEventListener('input',setRange);
-$('reset').addEventListener('click',()=>{$('from').value=0;$('to').value=1000;setRange();});
+$('session').addEventListener('change',refresh);
+$('reset').addEventListener('click',resetWindow);
 $('more').addEventListener('click',()=>{mlLimit+=50;renderML();});
-window.addEventListener('resize',drawAll);refresh();
+window.addEventListener('resize',()=>{finishDrag();if(navigationEnabled&&hi-lo<minWindow()){const span=minWindow();lo=clamp(lo,fullLo,fullHi-span);hi=lo+span;}drawAll();});refresh();

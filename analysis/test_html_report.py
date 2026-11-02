@@ -125,6 +125,23 @@ class HtmlReportTest(unittest.TestCase):
     def test_javascript_interactions_and_localization(self):
         subprocess.run(["node", str(ASSETS / "test_dashboard.cjs")], check=True, capture_output=True)
 
+    def test_navigator_and_typography(self):
+        html = render_html({"points": [], "events": []})
+        self.assertNotIn('id="from"', html)
+        self.assertNotIn('id="to"', html)
+        self.assertNotIn('type="range"', html)
+        self.assertIn('id="navigator"', html)
+        self.assertIn('id="nav-left"', html)
+        self.assertIn('id="nav-pan"', html)
+        self.assertIn('id="nav-right"', html)
+        self.assertIn("setPointerCapture", html)
+        self.assertIn("pointercancel", html)
+        self.assertIn("lostpointercapture", html)
+        self.assertIn("tabular-nums", html)
+        self.assertIn('16px/1.65 Inter,"Segoe UI",Arial,sans-serif', html)
+        self.assertIn('13px Inter, "Segoe UI", Arial, sans-serif', html)
+        self.assertNotIn('11px system-ui', html)
+
 
 if __name__ == "__main__":
     unittest.main()

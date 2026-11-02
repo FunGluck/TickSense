@@ -8,11 +8,15 @@
 <noscript>Для интерактивных графиков включите JavaScript. Интернет не требуется.</noscript>
 <nav><a href="#overview">Обзор</a><a href="#charts">Графики</a><a href="#events">События производительности</a><a href="#ml">ML-аномалии</a></nav>
 <section id="overview"><div class="section-head"><h2>Обзор</h2><label>Сессии сервера <select id="session" aria-label="Сессии сервера"><option value="all">Все сессии</option></select></label></div><div id="cards" class="cards"></div><p class="notice">Пороговые эпизоды — регистрации отдельных сигналов. Их число не равно числу независимых проблем: сигналы могут пересекаться.</p></section>
-<section id="charts"><div class="section-head"><h2>Динамика показателей</h2><button id="reset">Сбросить масштаб</button></div><p class="muted">Колесо мыши — масштабирование около указателя. Наведите курсор или нажмите на график для просмотра точки. Ползунки задают общий диапазон обоих графиков.</p>
-<div class="range"><label>Начало диапазона <input id="from" aria-label="Начало диапазона" type="range" min="0" max="1000" value="0"></label><label>Конец диапазона <input id="to" aria-label="Конец диапазона" type="range" min="0" max="1000" value="1000"></label></div><p id="period" class="muted"></p>
+<section id="charts"><div class="section-head"><h2>Динамика показателей</h2><button id="reset">Сбросить масштаб</button></div><p class="muted">Колесо мыши — масштабирование около указателя. Перетаскивайте график для перемещения окна. Наведение или нажатие показывает ближайшую точку.</p>
+<p id="period" class="muted"></p>
 <div class="legend"><span class="blue">● Измерения</span><span class="orange">● Статистические аномалии</span><span class="pink">× ML-аномалии</span><span class="green">◆ Пороговые сигналы</span></div>
+<article class="chart navigator"><h3>Обзор диапазона · MSPT</h3><p id="nav-help" class="muted">Тяните боковые маркеры, чтобы изменить границы, или середину выделения, чтобы переместить окно. Мышь и сенсорный ввод поддерживаются. С клавиатуры: выберите кнопку ниже и используйте ← / →; Shift ускоряет шаг, Home / End перемещают к краям.</p>
+<canvas id="navigator" aria-label="Обзорный график MSPT с выделенным временным диапазоном" aria-describedby="nav-help"></canvas>
+<div class="nav-controls" role="group" aria-label="Управление временным диапазоном с клавиатуры"><button id="nav-left" aria-describedby="nav-help">Начало диапазона</button><button id="nav-pan" aria-describedby="nav-help">Переместить окно</button><button id="nav-right" aria-describedby="nav-help">Конец диапазона</button></div><p id="nav-status" role="status" class="muted"></p></article>
 <article class="chart"><h3>MSPT по времени · мс</h3><canvas id="mspt" aria-label="График MSPT по времени, UTC"></canvas></article>
-<article class="chart"><h3>TPS по времени</h3><canvas id="tps" aria-label="График TPS по времени, UTC"></canvas></article><div id="tooltip" role="status" hidden></div></section>
+<article class="chart"><h3>TPS по времени</h3><canvas id="tps" aria-label="График TPS по времени, UTC"></canvas></article>
+<div id="tooltip" role="status" hidden></div></section>
 <section id="events"><div class="section-head"><h2>События производительности</h2><span id="event-count" class="muted"></span></div><div id="event-list"></div></section>
 <section id="ml"><h2>ML-аномалии</h2><p class="notice">Оценка Isolation Forest — не вероятность проблемы и не доказательство ухудшения производительности. Чем ниже оценка, тем более необычно измерение для модели.</p><div id="ml-list"></div><button id="more" hidden>Показать ещё</button></section>
 <footer>TickSense · Исследовательский отчёт. Наблюдаемый временной охват не является точной длительностью лага.</footer>
