@@ -27,5 +27,7 @@ def load_data(csv_path: Path) -> pd.DataFrame:
     df["session_id"] = (df["elapsed_ms"].diff() < 0).cumsum() + 1
     previous = df.groupby("session_id")["players_online"].shift(1)
     df["online_changed"] = previous.notna() & df["players_online"].ne(previous)
+    df["source_file"] = str(csv_path.resolve())
+    df["csv_row"] = np.arange(len(df)) + 2
 
     return df

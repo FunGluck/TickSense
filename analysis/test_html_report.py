@@ -1,0 +1,130 @@
+from copy import deepcopy
+from html.parser import HTMLParser
+import json
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+
+import numpy as np
+import pandas as pd
+from analysis.data import load_data
+from analysis.features import engineer_features
+from analysis.statistical import detect_statistical
+from analysis.report import build_report
+from analysis.html_report import prepare_html_data, render_html, write_html_report, ASSETS
+
+
+class Tags(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.external = []
+        self.scripts = 0
+    def handle_starttag(self, tag, attrs):
+        if tag == "script":
+            self.scripts += 1
+        for key, value in attrs:
+            if key in ("src", "href") and value and not value.startswith("#"):
+                self.external.append(value)
+
+
+class HtmlReportTest(unittest.TestCase):
+    def frame(self, folder, v2=False, event=True):
+        frame = pd.DataFrame({"timestamp_utc": pd.date_range("2026-11-01", periods=8, freq="10s", tz="UTC"),
+                              "elapsed_ms": list(range(4)) * 2, "mspt_avg": [1, 60 if event else 1] + [2] * 6,
+                              "tps_1m": 20, "players_online": 1})
+        if v2:
+            frame["loaded_chunks"] = range(8)
+            frame["entities_total"] = range(8)
+            frame["gc_collection_count"] = range(8)
+            frame["gc_collection_time_ms"] = range(8)
+            frame["jvm_heap_used_bytes"] = 50
+            frame["jvm_heap_committed_bytes"] = 100
+        path = Path(folder) / "input.csv"
+        frame.to_csv(path, index=False)
+        result = detect_statistical(engineer_features(load_data(path)))
+        result["anomaly_score"] = 0.1
+        result["ml_anomaly"] = False
+        return result
+
+    def test_v1_v2_html_and_json_unchanged(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for v2 in (False, True):
+                frame = self.frame(folder, v2)
+                report = build_report(frame)
+                original = deepcopy(report)
+                original_frame = frame.copy(deep=True)
+                path = Path(folder) / "nested/report.html"
+                write_html_report(frame, report, path)
+                html = path.read_text(encoding="utf-8")
+                self.assertIn('<html lang="ru">', html)
+                for label in ("Обзор", "События производительности", "ML-аномалии", "Сессии сервера", "Средний MSPT", "Максимальный MSPT", "Минимальный TPS"):
+                    self.assertIn(label, html)
+                self.assertNotIn(str(Path(folder).resolve()), html)
+                self.assertEqual(report, original)
+                pd.testing.assert_frame_equal(frame, original_frame)
+
+    def test_no_events_and_nan(self):
+        with tempfile.TemporaryDirectory() as folder:
+            frame = self.frame(folder, event=False)
+            frame["anomaly_score"] = np.nan
+            payload = prepare_html_data(frame, build_report(frame))
+            self.assertEqual(payload["events"], [])
+            self.assertIsNone(payload["points"][0]["rolling_threshold"])
+            self.assertIsNone(payload["points"][0]["anomaly_score"])
+            html = render_html(payload)
+            self.assertIn("Событий не обнаружено", html)
+            self.assertNotIn(": NaN", html)
+
+    def test_untrusted_text_and_json_are_data(self):
+        attack = '</script><img src="https://bad.invalid" onerror="alert(1)">&\u2028'
+        html = render_html({"points": [], "events": [], "test": attack})
+        parser = Tags()
+        parser.feed(html)
+        self.assertEqual(parser.scripts, 2)
+        self.assertEqual(parser.external, [])
+        embedded = re.search(r'<script id="report-data" type="application/json">(.*?)</script>', html, re.S)[1]
+        self.assertEqual(json.loads(embedded)["test"], attack)
+        self.assertNotIn('<img', html)
+        self.assertIn('\\u003c/script', html)
+        js = (ASSETS / "dashboard.js").read_text(encoding="utf-8")
+        self.assertNotIn("innerHTML", js)
+        self.assertNotIn("eval(", js)
+        self.assertIn("textContent", js)
+
+    def test_offline_and_russian_presentation(self):
+        html = render_html({"points": [], "events": []})
+        parser = Tags(); parser.feed(html)
+        self.assertEqual(parser.external, [])
+        for forbidden in ("fetch(", "XMLHttpRequest", "https://", "http://", "@import", "WebSocket", "url("):
+            self.assertNotIn(forbidden, html)
+        self.assertIn("'ru-RU'", html)
+        self.assertIn("['измерение','измерения','измерений']", html)
+        self.assertIn("timeZone:'UTC'", html)
+        for english in ("Overview", "No events detected", "Measurements", "Minimum TPS", "Performance Events", "Rolling threshold", "committed heap"):
+            self.assertNotIn(english, html)
+        for identifier in ("gc_time_delta_ms", "loaded_chunks_delta", "high_mspt"):
+            self.assertRegex(html, identifier + r":'[^']*[А-Яа-я]")
+
+    def test_cli_existing_options_and_json_unchanged(self):
+        with tempfile.TemporaryDirectory() as folder:
+            self.frame(folder, v2=True)
+            csv = Path(folder) / "input.csv"
+            base = [sys.executable, "-m", "analysis.analyze", str(csv), str(csv), "--no-show"]
+            old = Path(folder) / "old.json"; new = Path(folder) / "new.json"
+            subprocess.run(base + ["--json", str(old)], check=True, capture_output=True)
+            html = Path(folder) / "report.html"; png = Path(folder) / "report.png"
+            subprocess.run(base + ["--json", str(new), "--html", str(html), "--png", str(png)], check=True, capture_output=True)
+            self.assertEqual(old.read_bytes(), new.read_bytes())
+            self.assertTrue(html.is_file()); self.assertTrue(png.is_file())
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js is optional for JavaScript logic tests")
+    def test_javascript_interactions_and_localization(self):
+        subprocess.run(["node", str(ASSETS / "test_dashboard.cjs")], check=True, capture_output=True)
+
+
+if __name__ == "__main__":
+    unittest.main()
