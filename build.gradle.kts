@@ -1,6 +1,6 @@
 plugins { java }
 group = "dev.ticksense"
-version = "0.8.1-compat-test"
+version = "0.8.1-pilot"
 repositories {
     mavenCentral()
     maven("https://repo.papermc.io/repository/maven-public/")
