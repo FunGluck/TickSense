@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="TickSense — локальная телеметрия Paper и понятные отчёты о производительности Minecraft-сервера.">
+  <title>TickSense — экспериментальный Pilot</title>
+  <style>
+    :root{color-scheme:dark;font-family:Inter,"Segoe UI",Arial,sans-serif;background:#0c1018;color:#e6edf8}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at top right,#18342f,transparent 65%);line-height:1.65}
+    main{max-width:960px;margin:auto;padding:clamp(28px,7vw,88px) 24px}header{display:flex;justify-content:space-between;gap:16px;align-items:center}
+    a{color:#77e1bb;text-underline-offset:4px}a:focus-visible{outline:3px solid #77e1bb;outline-offset:5px}
+    .badge{border:1px solid #31594d;color:#77e1bb;border-radius:99px;padding:5px 14px;font-size:14px}
+    h1{font-size:clamp(46px,10vw,88px);line-height:1.1;margin:64px 0 24px;letter-spacing:-1px}h2{font-size:22px;margin-top:0}
+    .intro{font-size:clamp(18px,3vw,23px);max-width:760px;color:#bac6d6}.actions{display:flex;gap:20px;align-items:center;flex-wrap:wrap;margin:32px 0 48px}
+    .button{background:#77e1bb;color:#0c1018;font-weight:600;text-decoration:none;padding:14px 22px;border-radius:10px}.button:hover{background:#a1efcf}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.card{background:#141b28;border:1px solid #283246;border-radius:16px;padding:24px}
+    .card p{color:#bac6d6}footer{color:#9baac0;border-top:1px solid #283246;margin-top:40px;padding-top:24px;font-size:15px}
+    @media(max-width:600px){.grid{grid-template-columns:1fr}h1{margin-top:44px}header{flex-wrap:wrap}}
+  </style>
+</head>
+<body><main>
+  <header><strong>TickSense</strong><span class="badge">Экспериментальный Pilot</span></header>
+  <h1>Понять, как<br>работает сервер.</h1>
+  <p class="intro">TickSense собирает локальную телеметрию Minecraft Paper. Отдельный Python-анализатор превращает CSV в автономный HTML-отчёт с графиками, событиями и пояснениями.</p>
+  <div class="actions"><a class="button" href="pilot-dragon.html">Посмотреть пример отчёта</a><a href="https://github.com/fungluck/TickSense">Исходный код на GitHub</a></div>
+  <div class="grid">
+    <section class="card"><h2>Проверенные версии</h2><p>Java 21. Один экспериментальный JAR проверен на Paper 1.21.1 (133), 1.21.4 (232), 1.21.8 (60) и 1.21.11 (132).</p><p>Это не заявление о поддержке всех Paper 1.21.x. <a href="https://github.com/fungluck/TickSense/blob/main/docs/validation-summary.md">Результаты и ограничения</a>.</p></section>
+    <section class="card"><h2>Контроль остаётся у вас</h2><p>Плагин записывает CSV на сервере. Автоматической отправки телеметрии нет. В Pilot разработчик анализирует выбранные администратором файлы и возвращает готовый отчёт.</p><p>Демо показывает возможности интерфейса и не доказывает качество диагностики.</p></section>
+  </div>
+  <footer>Проект находится на стадии Pilot. Отчёт не устанавливает причины лагов автоматически; низкие накладные расходы и production-готовность пока не доказаны. Начинайте с тестовой копии сервера и резервной копии.</footer>
+</main></body></html>
