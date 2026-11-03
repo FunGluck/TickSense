@@ -32,6 +32,19 @@ class Tags(HTMLParser):
 
 
 class HtmlReportTest(unittest.TestCase):
+    def assert_body_typography(self, css):
+        """Check the font shorthand values used by this stylesheet, not spacing."""
+        css = re.sub(r'/\*.*?\*/', '', css, flags=re.S)
+        bodies = re.findall(r'\bbody\s*\{([^}]+)\}', css, flags=re.I)
+        fonts = [font for body in bodies for font in re.findall(r'(?:^|;)\s*font\s*:\s*([^;]+)', body, flags=re.I)]
+        self.assertTrue(fonts, 'body must define its font')
+        match = re.fullmatch(r'\s*(\d+(?:\.\d+)?)px\s*/\s*(\d+(?:\.\d+)?)\s+(.+?)\s*', fonts[-1])
+        self.assertIsNotNone(match, 'Expected font size / unitless line-height and family stack')
+        self.assertEqual(float(match[1]), 16)
+        self.assertEqual(float(match[2]), 1.65)
+        families = [part.strip().strip('\"\'').casefold() for part in match[3].split(',')]
+        self.assertEqual(families, ['inter', 'segoe ui', 'arial', 'sans-serif'])
+
     def frame(self, folder, v2=False, event=True):
         frame = pd.DataFrame({"timestamp_utc": pd.date_range("2026-11-01", periods=8, freq="10s", tz="UTC"),
                               "elapsed_ms": list(range(4)) * 2, "mspt_avg": [1, 60 if event else 1] + [2] * 6,
@@ -138,9 +151,19 @@ class HtmlReportTest(unittest.TestCase):
         self.assertIn("pointercancel", html)
         self.assertIn("lostpointercapture", html)
         self.assertIn("tabular-nums", html)
-        self.assertIn('16px/1.65 Inter,"Segoe UI",Arial,sans-serif', html)
+        self.assert_body_typography((ASSETS / 'style.css').read_text(encoding='utf-8'))
         self.assertIn('13px Inter, "Segoe UI", Arial, sans-serif', html)
         self.assertNotIn('11px system-ui', html)
+
+    def test_typography_semantics_accept_spacing_and_reject_wrong_values(self):
+        for declaration in ('16px/1.65 Inter,"Segoe UI",Arial,sans-serif',
+                            '16px / 1.65 Inter, "Segoe UI", Arial, sans-serif'):
+            self.assert_body_typography('body { font: ' + declaration + '; }')
+        for declaration in ('14px/1.65 Inter,"Segoe UI",Arial,sans-serif',
+                            '16px/1.2 Inter,"Segoe UI",Arial,sans-serif',
+                            '16px/1.65 monospace'):
+            with self.subTest(font=declaration), self.assertRaises(AssertionError):
+                self.assert_body_typography('body { font: ' + declaration + '; }')
 
 
 if __name__ == "__main__":
