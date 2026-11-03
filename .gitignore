@@ -11,7 +11,8 @@ __pycache__/
 *.py[cod]
 
 # Local metrics, logs and datasets
-*.csv
+# Keep fixtures/configuration/public demo eligible for Git; ignore local telemetry by location.
+/metrics*.csv
 *.log
 *.log.*
 logs/
@@ -32,3 +33,36 @@ dist/
 /report.html
 /report.png
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local Paper servers, worlds, plugins and benchmark output
+/world/
+/world_nether/
+/world_the_end/
+/plugins/
+/server/
+/servers/
+/paper-*/
+/TickSense-Compatibility/
+/benchmark-results/
+/overhead-results/
+/scripts/overhead/
+/report-*.json
+/report-*.html
+/report-*.png
+/pilot-*.html
+/pilot-*.json
+/local-data/
+
+# Editor/Windows temporary and backup files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
