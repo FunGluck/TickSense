@@ -14,7 +14,8 @@ def plot_metrics(df: pd.DataFrame, png_path: Path | None = None, *, show: bool =
     fig, ax = plt.subplots(figsize=(12, 6))
 
     try:
-        for index, (_, session) in enumerate(df.groupby("session_id", sort=False)):
+        breaks = df.session_id.ne(df.session_id.shift()) | df.timestamp_utc.diff().dt.total_seconds().gt(30)
+        for index, (_, session) in enumerate(df.groupby(breaks.cumsum(), sort=False)):
             ax.plot(session["timestamp_utc"], session["mspt_avg"], color="steelblue", alpha=0.5,
                     label="MSPT" if index == 0 else None)
             ax.plot(session["timestamp_utc"], session["rolling_threshold"], color="orange",
