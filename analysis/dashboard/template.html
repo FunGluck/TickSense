@@ -6,8 +6,9 @@
 <body><main>
 <header><div><p class="eyebrow">TICKSENSE · ЛОКАЛЬНЫЙ АНАЛИЗ</p><h1>Производительность<br>под наблюдением<span>.</span></h1><p class="muted">Измеренная телеметрия. Объяснимые сигналы. Без предположений о причинах.</p></div><div class="offline">● Автономный отчёт<br><small>Все временные метки — UTC</small></div></header>
 <noscript>Для интерактивных графиков включите JavaScript. Интернет не требуется.</noscript>
-<nav><a href="#overview">Обзор</a><a href="#charts">Графики</a><a href="#events">События производительности</a><a href="#ml">ML-аномалии</a></nav>
+<nav><a href="#overview">Обзор</a><a href="#quality">Качество данных</a><a href="#charts">Графики</a><a href="#events">События производительности</a><a href="#ml">ML-аномалии</a></nav>
 <section id="overview"><div class="section-head"><h2>Обзор</h2><label>Сессии сервера <select id="session" aria-label="Сессии сервера"><option value="all">Все сессии</option></select></label></div><div id="cards" class="cards"></div><p class="notice">Пороговые эпизоды — регистрации отдельных сигналов. Их число не равно числу независимых проблем: сигналы могут пересекаться.</p></section>
+<section id="quality"><h2>Качество данных</h2><div id="quality-content"></div></section>
 <section id="charts"><div class="section-head"><h2>Динамика показателей</h2><button id="reset">Сбросить масштаб</button></div><p class="muted">Колесо мыши — масштабирование около указателя. Перетаскивайте график для перемещения окна. Наведение или нажатие показывает ближайшую точку.</p>
 <p id="period" class="muted"></p>
 <div class="legend"><span class="blue">● Измерения</span><span class="orange">● Статистические аномалии</span><span class="pink">× ML-аномалии</span><span class="green">◆ Пороговые сигналы</span></div>

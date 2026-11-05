@@ -91,7 +91,7 @@ function draw(id,key){
   // A change of session/file, missing value or backward timestamp breaks the path.
   c.strokeStyle='#7faeff';c.lineWidth=1.7;c.beginPath();let previous=null;
   rows.forEach(p=>{if(p[key]===null||!Number.isFinite(p[key])){previous=null;return;}
-    if(!previous||p.session_id!==previous.session_id||p.source_file!==previous.source_file||time(p)<time(previous))c.moveTo(x(time(p)),y(p[key]));
+    if(!previous||p.session_id!==previous.session_id||p.source_file!==previous.source_file||time(p)-time(previous)>(data.data_quality?.max_gap_seconds??30)*1000||time(p)<time(previous))c.moveTo(x(time(p)),y(p[key]));
     else c.lineTo(x(time(p)),y(p[key]));previous=p;});c.stroke();
   const eventRows=new Set(events.flatMap(e=>e.source_rows.map(r=>`${e.session_id}|${e.source_file}|${r}`)));
   valid.forEach(p=>{const px=x(time(p)),py=y(p[key]);
@@ -129,7 +129,7 @@ function drawNavigator(){
   const max=valid.reduce((v,p)=>Math.max(v,p.mspt_avg),1),y=v=>bottom-v/max*(bottom-12);
   c.strokeStyle='#7faeff';c.lineWidth=1.5;c.beginPath();let previous=null;
   points.forEach(p=>{if(p.mspt_avg===null||!Number.isFinite(p.mspt_avg)||!Number.isFinite(time(p))){previous=null;return;}
-    if(!previous||p.session_id!==previous.session_id||p.source_file!==previous.source_file||time(p)<time(previous))c.moveTo(navX(time(p)),y(p.mspt_avg));
+    if(!previous||p.session_id!==previous.session_id||p.source_file!==previous.source_file||time(p)-time(previous)>(data.data_quality?.max_gap_seconds??30)*1000||time(p)<time(previous))c.moveTo(navX(time(p)),y(p.mspt_avg));
     else c.lineTo(navX(time(p)),y(p.mspt_avg));previous=p;});c.stroke();
   const left=navX(lo),right=navX(hi),g=navigatorGeometry();
   c.fillStyle='#050a13b3';c.fillRect(g.left,0,Math.max(0,left-g.left),bottom);c.fillRect(right,0,Math.max(0,g.left+g.width-right),bottom);
@@ -188,3 +188,18 @@ $('session').addEventListener('change',refresh);
 $('reset').addEventListener('click',resetWindow);
 $('more').addEventListener('click',()=>{mlLimit+=50;renderML();});
 window.addEventListener('resize',()=>{finishDrag();if(navigationEnabled&&hi-lo<minWindow()){const span=minWindow();lo=clamp(lo,fullLo,fullHi-span);hi=lo+span;}drawAll();});refresh();
+
+// All untrusted diagnostics are text nodes, never markup.
+function renderQuality(){
+ const q=data.data_quality,target=$('quality-content');
+ if(!q){el('p','Сведения о качестве данных недоступны.',target);return;}
+ el('p',q.status==='ok'?'Проверки пройдены. Предупреждений не обнаружено.':'Есть замечания к данным; учитывайте их при интерпретации.',target,'notice');
+ el('p',`${date(q.start_utc)} — ${date(q.end_utc)}`,target);
+ const cards=el('div',undefined,target,'cards');
+ [['Исходные CSV',q.source_csv_count],['Измерения',q.measurements],['Сессии сервера',q.sessions],['Длительные разрывы',q.long_gaps],['Максимальный интервал, с',q.max_interval_seconds]].forEach(([label,value])=>{const c=el('div',undefined,cards,'card');el('span',label,c);el('strong',num(value),c);});
+ if(q.split?.method==='chronological')el('p',`Хронологическое разделение: обучение — ${measurements(q.split.training_measurements)}, проверка — ${measurements(q.split.evaluation_measurements)}. Последнее обучение: ${date(q.split.training_last_utc)}; начало проверки: ${date(q.split.evaluation_first_utc)}. Графики и детекторы показывают проверочный период.`,target);
+ else el('p','Обучение и проверка — отдельные CSV. Качество данных показано для проверочного файла.',target);
+ if(q.warnings.length)list('Предупреждения',q.warnings,target);
+ list('Ограничения',q.limitations,target);
+}
+renderQuality();
