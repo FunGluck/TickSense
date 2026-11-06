@@ -74,7 +74,7 @@ class HtmlReportTest(unittest.TestCase):
                 write_html_report(frame, report, path)
                 html = path.read_text(encoding="utf-8")
                 self.assertIn('<html lang="ru">', html)
-                for label in ("Обзор", "События производительности", "ML-отклонения", "Сессии сервера", "Средний MSPT", "Максимальный MSPT", "Минимальный TPS"):
+                for label in ("Итог наблюдения", "Периоды повышенной нагрузки", "Необычные изменения", "Сессии сервера", "Средний MSPT", "Максимальный MSPT", "Минимальный TPS"):
                     self.assertIn(label, html)
                 self.assertNotIn(str(Path(folder).resolve()), html)
                 self.assertEqual(report, original)
@@ -137,6 +137,21 @@ class HtmlReportTest(unittest.TestCase):
     @unittest.skipUnless(shutil.which("node"), "Node.js is optional for JavaScript logic tests")
     def test_javascript_interactions_and_localization(self):
         subprocess.run(["node", str(ASSETS / "test_dashboard.cjs")], check=True, capture_output=True)
+
+    def test_administrator_structure_and_closed_diagnostics(self):
+        template = (ASSETS / 'template.html').read_text(encoding='utf8')
+        order = ['overview', 'charts', 'events', 'ml', 'quality', 'technical']
+        positions = [template.index('id="' + section + '"') for section in order]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn('<details id="technical"><summary>Подробности анализа</summary>', template)
+        self.assertNotIn('<details id="technical" open', template)
+        before_charts = template[:template.index('<section id="charts">')]
+        for term in ['TRAIN', 'TEST', 'Isolation Forest', 'elapsed_ms', 'эвристик', 'стандартных отклонений']:
+            self.assertNotIn(term, before_charts)
+        for identifier in ['quality-content', 'training-coverage', 'ml-technical', 'event-technical']:
+            self.assertGreater(template.index('id="'+identifier+'"'), positions[-1])
+        self.assertRegex(template, r'<input id="show-ml" type="checkbox">')
+        self.assertIn('Как пользоваться графиком', template)
 
     def test_navigator_and_typography(self):
         html = render_html({"points": [], "events": []})

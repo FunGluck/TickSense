@@ -420,3 +420,20 @@ h2, h3, h4 {
 .marker-controls input {accent-color:#77e1bb}
 #result-cards .card strong {font-size:1.4rem}
 #result-cards .card p {margin-bottom:0}
+
+/* Compact administrator view; diagnostic content remains in native disclosures. */
+header {margin-bottom:16px;gap:16px}
+h1 {font-size:clamp(26px,3vw,38px);margin:8px 0}
+main {padding-top:24px}
+section {margin-top:24px}
+#cards {grid-template-columns:repeat(3,minmax(0,1fr))}
+#result-cards {grid-template-columns:repeat(2,minmax(0,1fr))}
+.card {padding:14px}
+#technical {margin-top:24px}
+.chart-help {padding:10px 14px;margin:10px 0}
+.navigator {padding:12px 16px}
+.navigator canvas {height:90px}
+.legend {gap:12px}
+@media(max-width:600px){#cards,#result-cards {grid-template-columns:1fr}header {align-items:flex-start}.offline {display:none}nav {gap:12px}.marker-controls {gap:.5rem}#tooltip {max-width:calc(100vw - 16px)}}
+/* Override the navigator's original ID rule while keeping readable axes. */
+#navigator {height:90px}

@@ -26,7 +26,7 @@ def _presentation(value):
 
 
 def prepare_html_data(df: pd.DataFrame, report: dict) -> dict:
-    columns = ["timestamp_utc", "session_id", "mspt_avg", "tps_1m", "stat_anomaly",
+    columns = ["timestamp_utc", "session_id", "players_online", "mspt_avg", "tps_1m", "stat_anomaly",
                "ml_anomaly", "anomaly_score", "rolling_threshold", "excess_mspt", "csv_row", "source_file"]
     points = df.reindex(columns=columns).copy()
     if "csv_row" not in df:
