@@ -118,3 +118,11 @@ get('mspt').calls=[];get('tps').calls=[];const toggled=Date.now();get('show-ml')
 run("data.event_insights={ml_episodes:Array.from({length:12},(_,i)=>({session_id:1,start_utc:data.points[i].timestamp_utc,last_observed_utc:data.points[i].timestamp_utc,measurements:1,single_observation:true,peak_mspt:3,min_tps:20,mean_mspt:3,players_min:1,players_max:1,context:{},observed_facts:[],suggested_checks:[],limitation:'Причина не установлена'}))}");
 get('session').listeners.change();assert.equal(get('ml-list').children.length,9);assert.equal(get('more').hidden,false);get('more').listeners.click();assert.equal(get('ml-list').children.length,13);assert.equal(get('more').hidden,true);
 get('session').value='2';get('session').listeners.change();assert.equal(get('ml-list').children[0].textContent,'Необычных периодов не обнаружено');
+
+// Low TPS first with overlapping high MSPT, unrelated high next, elevated last.
+run("globalThis.eventFixture=[['elevated_mspt',0,5,1,'a'],['high_mspt',60,100,1,'a'],['low_tps',30,70,1,'a'],['high_mspt',31,40,2,'a'],['low_tps',80,90,1,'a'],['high_mspt',0,10,1,'a'],['high_mspt',31,40,1,'b']].map(([signal,start,end,session_id,source_file],id)=>({id,signal,session_id,source_file,start_utc:new Date(start*1000).toISOString(),last_observed_utc:new Date(end*1000).toISOString()}))");
+const beforeOrder=run('JSON.stringify(eventFixture)');
+assert.deepEqual(JSON.parse(run('JSON.stringify(prioritizePerformanceEvents(eventFixture).map(e=>e.id))')),[2,1,4,5,3,6,0]);
+assert.equal(run('JSON.stringify(eventFixture)'),beforeOrder);
+assert.equal(run('new Set(prioritizePerformanceEvents(eventFixture)).size'),7);
+assert.equal(run('prioritizePerformanceEvents([]).length'),0);

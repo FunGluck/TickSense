@@ -44,10 +44,32 @@ function refresh(){
   renderEvents();renderML();drawAll();
 }
 function list(title,items,parent){el('h4',title,parent);const ul=el('ul',undefined,parent);items.forEach(v=>el('li',text(v),ul));}
+// Presentation order only. A high-MSPT episode accompanies the first overlapping
+// low-TPS episode in the same file/session; each original episode appears once.
+function prioritizePerformanceEvents(items){
+  const chronological=(a,b)=>Date.parse(a.start_utc)-Date.parse(b.start_utc);
+  const low=items.filter(e=>e.signal==='low_tps').sort(chronological);
+  const high=items.filter(e=>e.signal==='high_mspt').sort(chronological);
+  const elevated=items.filter(e=>e.signal==='elevated_mspt').sort(chronological);
+  const used=new Set(),ordered=[];
+  for(const episode of low){
+    ordered.push(episode);
+    for(const companion of high){
+      if(!used.has(companion)&&String(companion.session_id)===String(episode.session_id)
+         &&(companion.source_file??null)===(episode.source_file??null)
+         &&Date.parse(companion.start_utc)<=Date.parse(episode.last_observed_utc)
+         &&Date.parse(episode.start_utc)<=Date.parse(companion.last_observed_utc)){
+        ordered.push(companion);used.add(companion);
+      }
+    }
+  }
+  return [...ordered,...high.filter(e=>!used.has(e)),
+    ...items.filter(e=>!['low_tps','high_mspt','elevated_mspt'].includes(e.signal)).sort(chronological),...elevated];
+}
 function renderEvents(){
   const target=$('event-list');target.replaceChildren();$('event-technical').replaceChildren();$('event-count').textContent=events.length?'Сигналы могут пересекаться':'';
   if(!events.length){el('p',RU.noEvents,target,'empty');return;}
-  events.forEach(e=>{
+  prioritizePerformanceEvents(events).forEach(e=>{
     const card=el('details',undefined,target),summary=el('summary',undefined,card);
     el('strong',RU[e.signal]??RU.unknown,summary);el('span',`${date(e.start_utc)} · ${measurements(e.measurements)}`,summary);
     const stats=el('div',undefined,card,'stats');
