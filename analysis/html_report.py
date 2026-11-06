@@ -26,14 +26,14 @@ def _presentation(value):
 
 
 def prepare_html_data(df: pd.DataFrame, report: dict) -> dict:
-    columns = ["timestamp_utc", "session_id", "mspt_avg", "tps_1m", "stat_anomaly",
-               "ml_anomaly", "anomaly_score", "rolling_threshold", "csv_row", "source_file"]
+    columns = ["timestamp_utc", "session_id", "players_online", "mspt_avg", "tps_1m", "stat_anomaly",
+               "ml_anomaly", "anomaly_score", "rolling_threshold", "excess_mspt", "csv_row", "source_file"]
     points = df.reindex(columns=columns).copy()
     if "csv_row" not in df:
         points["csv_row"] = range(2, len(df) + 2)
     # pandas emits null for NaN/inf, including absent v2 metrics.
     records = json.loads(points.to_json(orient="records", date_format="iso", date_unit="ns"))
-    return _presentation({"data_quality": deepcopy(report.get("data_quality")), "points": records, "events": deepcopy(report["performance_events"]["episodes"])})
+    return _presentation({"interpretation": deepcopy(report.get("interpretation")), "data_quality": deepcopy(report.get("data_quality")), "points": records, "events": deepcopy(report["performance_events"]["episodes"])})
 
 
 def render_html(data: dict) -> str:

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 if __package__:
+    from .interpretation import interpret_results
     from .data_quality import load_period, assess_quality, chronological_split
     from .data import load_data
     from .features import engineer_features
@@ -13,6 +14,7 @@ if __package__:
     from .visualization import plot_metrics
     from .html_report import write_html_report
 else:
+    from interpretation import interpret_results
     from data_quality import load_period, assess_quality, chronological_split
     from data import load_data
     from features import engineer_features
@@ -52,6 +54,7 @@ def main() -> None:
         evaluation = predict_anomalies(train_model(training), evaluation)
         report = build_report(evaluation)
         report["data_quality"] = quality
+        report["interpretation"] = interpret_results(training, evaluation, report["performance_events"]["episodes"])
         output = json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False)
         print(output)
         if args.json_path:
