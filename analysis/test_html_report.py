@@ -153,6 +153,16 @@ class HtmlReportTest(unittest.TestCase):
         self.assertRegex(template, r'<input id="show-ml" type="checkbox">')
         self.assertIn('Как пользоваться графиком', template)
 
+    def test_health_uses_original_ambient_light_without_core(self):
+        css=(ASSETS/'style.css').read_text(encoding='utf8')
+        template=(ASSETS/'template.html').read_text(encoding='utf8')
+        for state in ['GREEN','YELLOW','RED']:
+            self.assertIn('data-health="'+state+'"',css)
+        self.assertIn('radial-gradient(ellipse at 85% 0, var(--health-glow) 0, transparent 40%)',css)
+        self.assertIn('--health-glow:#18342f',css)
+        for removed in ['energy-core','core-arrival','@keyframes','perspective(']:
+            self.assertNotIn(removed,css+template)
+
     def test_navigator_and_typography(self):
         html = render_html({"points": [], "events": []})
         self.assertNotIn('id="from"', html)

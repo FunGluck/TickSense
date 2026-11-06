@@ -14,7 +14,7 @@
 
 body {
     margin: 0;
-    background: radial-gradient(ellipse at 85% 0, #18342f 0, transparent 40%), var(--bg);
+    background: radial-gradient(ellipse at 85% 0, var(--health-glow) 0, transparent 40%), var(--bg);
     color: var(--text);
     font: 16px/1.65 Inter, "Segoe UI", Arial, sans-serif;
     font-variant-numeric: tabular-nums
@@ -439,3 +439,9 @@ section {margin-top:24px}
 #navigator {height:90px}
 
 #cards {grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+/* Original ambient light; only its colour follows the telemetry status. */
+:root {--health-glow:#242c38}
+:root[data-health="GREEN"] {--health-glow:#18342f}
+:root[data-health="YELLOW"] {--health-glow:#3b2c17}
+:root[data-health="RED"] {--health-glow:#3a1821}
+#health-label {font-weight:650;margin-bottom:0}

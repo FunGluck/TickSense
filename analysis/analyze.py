@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 if __package__:
+    from .event_insights import build_insights, performance_health
     from .history import attach_predictions, summarize_history
     from .interpretation import interpret_results
     from .data_quality import load_period, assess_quality, chronological_split
@@ -15,6 +16,7 @@ if __package__:
     from .visualization import plot_metrics
     from .html_report import write_html_report
 else:
+    from event_insights import build_insights, performance_health
     from history import attach_predictions, summarize_history
     from interpretation import interpret_results
     from data_quality import load_period, assess_quality, chronological_split
@@ -59,6 +61,8 @@ def main() -> None:
         report["full_period"] = summarize_history(history, evaluation, scope="pilot_full" if args.pilot_files else "evaluation_only")
         report["data_quality"] = quality
         report["interpretation"] = interpret_results(training, evaluation, report["performance_events"]["episodes"])
+        report["event_insights"] = build_insights(history)
+        report["performance_health"] = performance_health(history)
         output = json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False)
         print(output)
         if args.json_path:

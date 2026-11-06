@@ -23,12 +23,12 @@ const text=value=>String(value??'').replace(/(\d)\.(\d)/g,'$1,$2');
 function el(tag,content,parent,cls){const n=document.createElement(tag);if(content!==undefined)n.textContent=content;if(cls)n.className=cls;if(parent)parent.append(n);return n;}
 const sessions=[...new Set(data.points.map(p=>String(p.session_id)))];
 sessions.forEach(s=>{const o=el('option',`${RU.session} ${s}`,$('session'));o.value=s;});
-let points=[],events=[],lo=0,hi=1,fullLo=0,fullHi=1,mlLimit=50,navigationEnabled=false,drag=null;
+let points=[],events=[],lo=0,hi=1,fullLo=0,fullHi=1,mlLimit=50,episodeLimit=8,navigationEnabled=false,drag=null;
 const CANVAS_FONT='13px Inter, "Segoe UI", Arial, sans-serif';
 const time=p=>p._time??(p._time=Date.parse(p.timestamp_utc)), belongs=x=>$('session').value==='all'||String(x.session_id)===$('session').value;
 function refresh(){
   finishDrag();
-  points=data.points.filter(belongs);events=data.events.filter(belongs);mlLimit=50;
+  points=data.points.filter(belongs);events=data.events.filter(belongs);mlLimit=50;episodeLimit=8;
   const times=points.map(time).filter(Number.isFinite);fullLo=times.length?Math.min(...times):0;fullHi=times.length?Math.max(...times):1;
   navigationEnabled=times.length>1&&fullHi>fullLo;
   // Axis padding for a single timestamp only; not an observed duration.
@@ -44,10 +44,32 @@ function refresh(){
   renderEvents();renderML();drawAll();
 }
 function list(title,items,parent){el('h4',title,parent);const ul=el('ul',undefined,parent);items.forEach(v=>el('li',text(v),ul));}
+// Presentation order only. A high-MSPT episode accompanies the first overlapping
+// low-TPS episode in the same file/session; each original episode appears once.
+function prioritizePerformanceEvents(items){
+  const chronological=(a,b)=>Date.parse(a.start_utc)-Date.parse(b.start_utc);
+  const low=items.filter(e=>e.signal==='low_tps').sort(chronological);
+  const high=items.filter(e=>e.signal==='high_mspt').sort(chronological);
+  const elevated=items.filter(e=>e.signal==='elevated_mspt').sort(chronological);
+  const used=new Set(),ordered=[];
+  for(const episode of low){
+    ordered.push(episode);
+    for(const companion of high){
+      if(!used.has(companion)&&String(companion.session_id)===String(episode.session_id)
+         &&(companion.source_file??null)===(episode.source_file??null)
+         &&Date.parse(companion.start_utc)<=Date.parse(episode.last_observed_utc)
+         &&Date.parse(episode.start_utc)<=Date.parse(companion.last_observed_utc)){
+        ordered.push(companion);used.add(companion);
+      }
+    }
+  }
+  return [...ordered,...high.filter(e=>!used.has(e)),
+    ...items.filter(e=>!['low_tps','high_mspt','elevated_mspt'].includes(e.signal)).sort(chronological),...elevated];
+}
 function renderEvents(){
   const target=$('event-list');target.replaceChildren();$('event-technical').replaceChildren();$('event-count').textContent=events.length?'Сигналы могут пересекаться':'';
   if(!events.length){el('p',RU.noEvents,target,'empty');return;}
-  events.forEach(e=>{
+  prioritizePerformanceEvents(events).forEach(e=>{
     const card=el('details',undefined,target),summary=el('summary',undefined,card);
     el('strong',RU[e.signal]??RU.unknown,summary);el('span',`${date(e.start_utc)} · ${measurements(e.measurements)}`,summary);
     const stats=el('div',undefined,card,'stats');
@@ -70,7 +92,7 @@ function renderEvents(){
     list(RU.facts,ex.observed_facts??[],card);el('h4',RU.interpretation,card);el('p',text(ex.possible_interpretation),card);list(RU.limits,ex.limitations??[],card);
   });
 }
-function renderML(){
+function renderRawML(){
   const target=$('ml-list'),technical=$('ml-technical');target.replaceChildren();technical.replaceChildren();
   const rows=points.filter(p=>p.ml_anomaly).slice().sort((a,b)=>a.anomaly_score-b.anomaly_score);
   $('more').hidden=rows.length<=mlLimit;
@@ -202,7 +224,7 @@ for(const [id,mode] of [['nav-left','left'],['nav-pan','pan'],['nav-right','righ
 });
 $('session').addEventListener('change',refresh);
 $('reset').addEventListener('click',resetWindow);
-$('more').addEventListener('click',()=>{mlLimit+=50;renderML();});
+$('more').addEventListener('click',()=>{episodeLimit=Infinity;mlLimit+=50;renderML();});
 window.addEventListener('resize',()=>{finishDrag();if(navigationEnabled&&hi-lo<minWindow()){const span=minWindow();lo=clamp(lo,fullLo,fullHi-span);hi=lo+span;}drawAll();});refresh();
 
 // All untrusted diagnostics are text nodes, never markup.
@@ -246,3 +268,28 @@ function renderInterpretation(){
 renderInterpretation();
 const reportTimes=data.points.map(time).filter(Number.isFinite);
 $('report-period').textContent=reportTimes.length?`Анализируемый период: ${date(Math.min(...reportTimes))} — ${date(Math.max(...reportTimes))}`:RU.noData;
+
+function renderML(){
+ if(!data.event_insights)return renderRawML();
+ const rows=data.event_insights.ml_episodes.filter(belongs),target=$('ml-list');target.replaceChildren();
+ // Keep individual scores and source references in the existing technical disclosure.
+ renderRawML();target.replaceChildren();$('raw-more').hidden=points.filter(p=>p.ml_anomaly).length<=mlLimit;$('more').hidden=rows.length<=episodeLimit;
+ if(!rows.length){el('p','Необычных периодов не обнаружено',target,'empty');return;}
+ rows.slice(0,episodeLimit).forEach(e=>{
+  const card=el('details',undefined,target),summary=el('summary',undefined,card);
+  el('strong',e.threshold_signal?'Период необычной нагрузки':'Период необычного поведения',summary);
+  el('span',`${date(e.start_utc)} — ${date(e.last_observed_utc)}`,summary);
+  el('p',`MSPT: максимум ${num(e.peak_mspt)} мс, среднее ${num(e.mean_mspt)} мс · TPS: минимум ${num(e.min_tps)} · Игроки: ${num(e.players_min,0)}–${num(e.players_max,0)}`,card);
+  el('p',`${measurements(e.measurements)} · ${e.single_observation?'Одиночное наблюдение':`Наблюдаемый охват: ${num(e.observed_span_seconds)} с`}`,card);
+  const labels={entities_delta:'Изменение сущностей',loaded_chunks_delta:'Изменение загруженных чанков',gc_count_delta:'Прирост числа GC',gc_time_delta_ms:'Прирост накопленного времени GC, мс'};
+  Object.entries(e.context).forEach(([key,v])=>el('p',`${labels[key]}: ${num(v.sum)}${key.startsWith('gc_')?'':` · максимальный положительный прирост ${num(v.max_positive_delta)}`} · доступно ${num(v.available,0)} наблюдений`,card));
+  if(e.observed_facts.length)list('Что происходило',e.observed_facts,card);
+  if(e.suggested_checks.length)list('Что стоит проверить',e.suggested_checks,card);
+  el('p',e.limitation,card,'muted');
+ });
+ el('p',`Показано периодов: ${num(Math.min(rows.length,episodeLimit),0)} из ${num(rows.length,0)}`,target,'muted');
+}
+$('raw-more').addEventListener('click',()=>{mlLimit+=50;renderML();});
+const health=data.performance_health;
+if(health){document.documentElement?.setAttribute('data-health',health.state);$('health-label').textContent=health.label;$('health-reason').textContent=health.reason;}
+else{$('health-label').textContent='Недостаточно данных';}
