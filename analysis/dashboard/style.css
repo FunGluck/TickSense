@@ -437,3 +437,5 @@ section {margin-top:24px}
 @media(max-width:600px){#cards,#result-cards {grid-template-columns:1fr}header {align-items:flex-start}.offline {display:none}nav {gap:12px}.marker-controls {gap:.5rem}#tooltip {max-width:calc(100vw - 16px)}}
 /* Override the navigator's original ID rule while keeping readable axes. */
 #navigator {height:90px}
+
+#cards {grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}

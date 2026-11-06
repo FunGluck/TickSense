@@ -33,7 +33,7 @@ def prepare_html_data(df: pd.DataFrame, report: dict) -> dict:
         points["csv_row"] = range(2, len(df) + 2)
     # pandas emits null for NaN/inf, including absent v2 metrics.
     records = json.loads(points.to_json(orient="records", date_format="iso", date_unit="ns"))
-    return _presentation({"interpretation": deepcopy(report.get("interpretation")), "data_quality": deepcopy(report.get("data_quality")), "points": records, "events": deepcopy(report["performance_events"]["episodes"])})
+    return _presentation({"full_period": deepcopy(report.get("full_period")), "interpretation": deepcopy(report.get("interpretation")), "data_quality": deepcopy(report.get("data_quality")), "points": records, "events": deepcopy(report.get("full_period", report)["performance_events"]["episodes"])})
 
 
 def render_html(data: dict) -> str:
