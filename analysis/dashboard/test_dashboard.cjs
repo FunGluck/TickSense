@@ -26,7 +26,7 @@ assert.equal(run('num(118.33)'),'118,33');assert.ok(run('date(points[0].timestam
 assert.equal(get('result-cards').children.length,2);assert.match(get('analysis-conclusion').textContent,/Обнаружены периоды/);assert.ok(get('result-cards').children[1].children[1].textContent.includes('25'));
 assert.equal(get('ml-list').children[0].children[0].children[0].children[0].children.length,5);
 assert.equal(get('ml-technical').children[0].children[0].children[0].children[0].children.length,5);
-assert.equal(get('cards').children.length,3);assert.equal(get('event-list').children.length,1);
+assert.equal(get('cards').children.length,5);assert.equal(get('event-list').children.length,1);
 get('session').value='2';get('session').listeners.change();
 assert.equal(run('points.length'),2);assert.equal(run('events.length'),0);assert.equal(get('event-list').children[0].textContent,'Событий не обнаружено');assert.equal(get('ml-list').children[0].textContent,'Необычных изменений не обнаружено');
 get('session').value='all';get('session').listeners.change();
@@ -94,3 +94,23 @@ assert.equal(run('navigationEnabled'),false);assert.equal(get('nav-left').disabl
 const singleLo=run('lo');nav.listeners.pointerdown(pointer(24));assert.equal(run('drag'),null);assert.equal(run('lo'),singleLo);
 run('data.points.splice(0)');get('session').listeners.change();assert.equal(run('points.length'),0);assert.ok(run('Number.isFinite(lo)&&Number.isFinite(hi)'));assert.equal(get('nav-status').textContent,'Нет данных в выбранном диапазоне');
 console.log('Проверены границы, перенос, минимальная ширина, синхронизация, capture/cancel, клавиатура, сессии, одиночный и пустой наборы.');
+
+// Boundary belongs only to its real session, and no line is fabricated without scores.
+run("data.points.splice(0,data.points.length,...[0,1,2,3].map(i=>({timestamp_utc:new Date(Date.UTC(2026,10,1,0,0,i*10)).toISOString(),session_id:i<2?1:2,mspt_avg:2,tps_1m:20,ml_anomaly:i>=2,stat_anomaly:false,anomaly_score:i>=2?-.1:null})));data.full_period={ml_boundary:{timestamp_utc:data.points[2].timestamp_utc,session_id:2}}");
+get('session').value='all';get('session').listeners.change();get('mspt').calls=[];run('drawAll()');
+assert.ok(get('mspt').calls.some(c=>c.key==='fillText'&&c.args[0]==='Начало поиска необычных изменений'));
+get('session').value='1';get('session').listeners.change();get('mspt').calls=[];run('drawAll()');
+assert.ok(!get('mspt').calls.some(c=>c.key==='fillText'&&c.args[0]==='Начало поиска необычных изменений'));
+run('data.full_period.ml_boundary=null');get('session').value='all';get('session').listeners.change();get('mspt').calls=[];run('drawAll()');assert.ok(!get('mspt').calls.some(c=>c.key==='fillText'&&c.args[0]==='Начало поиска необычных изменений'));
+// A long gap in one session starts a new line segment; no interpolated bridge.
+run("data.points.splice(0,data.points.length,...[0,10,120,130].map(t=>({timestamp_utc:new Date(Date.UTC(2026,10,1)+t*1000).toISOString(),session_id:1,mspt_avg:2,tps_1m:20,ml_anomaly:false,stat_anomaly:false})))");
+get('session').value='all';get('session').listeners.change();get('mspt').calls=[];run('drawAll()');
+const paths=[];let path=[];for(const call of get('mspt').calls){if(call.key==='beginPath')path=[];else if(call.key==='stroke')paths.push(path);else path.push(call);}
+assert.ok(paths.some(path=>path.filter(c=>c.key==='moveTo').length===2&&path.filter(c=>c.key==='lineTo').length===2));
+// Large history: preserve every point, keep both tables paginated, no point DOM nodes.
+run("data.points.splice(0,data.points.length,...Array.from({length:13586},(_,i)=>({timestamp_utc:new Date(Date.UTC(2026,10,5)+i*10000).toISOString(),session_id:1,mspt_avg:i===100?118:3,tps_1m:20,ml_anomaly:i>=9510,stat_anomaly:i===100,anomaly_score:i>=9510?-.1:null})));data.events.splice(0)");
+get('mspt').calls=[];get('tps').calls=[];const started=Date.now();get('session').listeners.change();const refreshMs=Date.now()-started;
+assert.equal(run('plotInfo.mspt.rows.length'),13586);assert.equal(run('plotInfo.tps.rows.length'),13586);
+assert.equal(get('ml-list').children[0].children[0].children[1].children.length,50);
+assert.equal(get('ml-technical').children[0].children[0].children[1].children.length,50);
+get('mspt').calls=[];get('tps').calls=[];const toggled=Date.now();get('show-ml').checked=true;get('show-ml').listeners.change();console.log(JSON.stringify({canvasDoubleRows:13586,refreshMs,markerToggleMs:Date.now()-toggled}));

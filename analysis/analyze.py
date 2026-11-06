@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 if __package__:
+    from .history import attach_predictions, summarize_history
     from .interpretation import interpret_results
     from .data_quality import load_period, assess_quality, chronological_split
     from .data import load_data
@@ -14,6 +15,7 @@ if __package__:
     from .visualization import plot_metrics
     from .html_report import write_html_report
 else:
+    from history import attach_predictions, summarize_history
     from interpretation import interpret_results
     from data_quality import load_period, assess_quality, chronological_split
     from data import load_data
@@ -52,7 +54,9 @@ def main() -> None:
             evaluation = detect_statistical(engineer_features(raw))
             quality = assess_quality(raw, split={"method": "separate_files"})
         evaluation = predict_anomalies(train_model(training), evaluation)
+        history = attach_predictions(prepared, evaluation) if args.pilot_files else evaluation
         report = build_report(evaluation)
+        report["full_period"] = summarize_history(history, evaluation, scope="pilot_full" if args.pilot_files else "evaluation_only")
         report["data_quality"] = quality
         report["interpretation"] = interpret_results(training, evaluation, report["performance_events"]["episodes"])
         output = json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False)
@@ -63,7 +67,7 @@ def main() -> None:
         if args.png_path or not args.no_show:
             plot_metrics(evaluation, args.png_path, show=not args.no_show)
         if args.html_path:
-            write_html_report(evaluation, report, args.html_path)
+            write_html_report(history, report, args.html_path)
         columns = [
             "timestamp_utc",
             "mspt_avg",

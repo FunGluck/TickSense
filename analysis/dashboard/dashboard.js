@@ -25,7 +25,7 @@ const sessions=[...new Set(data.points.map(p=>String(p.session_id)))];
 sessions.forEach(s=>{const o=el('option',`${RU.session} ${s}`,$('session'));o.value=s;});
 let points=[],events=[],lo=0,hi=1,fullLo=0,fullHi=1,mlLimit=50,navigationEnabled=false,drag=null;
 const CANVAS_FONT='13px Inter, "Segoe UI", Arial, sans-serif';
-const time=p=>Date.parse(p.timestamp_utc), belongs=x=>$('session').value==='all'||String(x.session_id)===$('session').value;
+const time=p=>p._time??(p._time=Date.parse(p.timestamp_utc)), belongs=x=>$('session').value==='all'||String(x.session_id)===$('session').value;
 function refresh(){
   finishDrag();
   points=data.points.filter(belongs);events=data.events.filter(belongs);mlLimit=50;
@@ -34,7 +34,7 @@ function refresh(){
   // Axis padding for a single timestamp only; not an observed duration.
   if(fullHi===fullLo){fullLo-=500;fullHi+=500;}lo=fullLo;hi=fullHi;
   const values=points.map(p=>p.mspt_avg).filter(v=>v!==null&&Number.isFinite(v)),tps=points.map(p=>p.tps_1m).filter(v=>v!==null&&Number.isFinite(v));
-  const cards=[[RU.minimum,tps.length?num(Math.min(...tps)):'—'],
+  const cards=[[RU.measurements,num(points.length,0)],[RU.sessions,num(new Set(points.map(p=>p.session_id)).size,0)],[RU.minimum,tps.length?num(Math.min(...tps)):'—'],
     [RU.mean,values.length?num(values.reduce((a,b)=>a+b,0)/values.length)+' мс':'—'],
     [RU.peak,values.length?num(Math.max(...values))+' мс':'—']];
   $('analysis-conclusion').textContent=!points.length?RU.noData:events.length?
@@ -80,7 +80,7 @@ function renderML(){
   rows.slice(0,mlLimit).forEach(p=>{const tr=el('tr',undefined,body);const description=p.players_online===0?'Необычное состояние сервера без игроков':'Необычное состояние сервера';
     [date(p.timestamp_utc),num(p.mspt_avg,3),num(p.tps_1m),num(p.players_online,0),description].forEach(v=>el('td',v,tr));});
   const details=table(technical,[RU.time,RU.session,RU.file,RU.rows,RU.score]);
-  rows.forEach(p=>{const tr=el('tr',undefined,details);[date(p.timestamp_utc),String(p.session_id),p.source_file??'—',num(p.csv_row,0),num(p.anomaly_score,6)].forEach(v=>el('td',v,tr));});
+  rows.slice(0,mlLimit).forEach(p=>{const tr=el('tr',undefined,details);[date(p.timestamp_utc),String(p.session_id),p.source_file??'—',num(p.csv_row,0),num(p.anomaly_score,6)].forEach(v=>el('td',v,tr));});
   el('p',`${measurements(Math.min(rows.length,mlLimit))} из ${num(rows.length,0)}`,target,'muted');
 }
 let plotInfo={};
@@ -99,13 +99,24 @@ function draw(id,key){
     if(!previous||p.session_id!==previous.session_id||p.source_file!==previous.source_file||time(p)-time(previous)>(data.data_quality?.max_gap_seconds??30)*1000||time(p)<time(previous))c.moveTo(x(time(p)),y(p[key]));
     else c.lineTo(x(time(p)),y(p[key]));previous=p;});c.stroke();
   const eventRows=new Set(events.flatMap(e=>e.source_rows.map(r=>`${e.session_id}|${e.source_file}|${r}`)));
-  valid.forEach(p=>{const px=x(time(p)),py=y(p[key]);
-    c.fillStyle='#7faeff';c.beginPath();c.arc(px,py,1.7,0,Math.PI*2);c.fill();
-    if($('show-events').checked&&eventRows.has(`${p.session_id}|${p.source_file}|${p.csv_row}`)){c.strokeStyle='#77e1bb';c.lineWidth=1.6;c.strokeRect(px-5,py-5,10,10);}
-    if($('show-stat').checked&&p.stat_anomaly){c.fillStyle='#ffbd66';c.beginPath();c.arc(px,py,3.5,0,Math.PI*2);c.fill();}
-    if($('show-ml').checked&&p.ml_anomaly){c.strokeStyle='#fb83ae';c.lineWidth=2;c.beginPath();c.moveTo(px-4,py-4);c.lineTo(px+4,py+4);c.moveTo(px+4,py-4);c.lineTo(px-4,py+4);c.stroke();}
-  });
+  // Batch point glyphs by style: retain every observation without one draw call per point.
+  c.fillStyle='#7faeff';c.beginPath();
+  valid.forEach(p=>{const px=x(time(p)),py=y(p[key]);c.moveTo(px+1.7,py);c.arc(px,py,1.7,0,Math.PI*2);});c.fill();
+  if($('show-events').checked){c.strokeStyle='#77e1bb';c.lineWidth=1.6;valid.forEach(p=>{
+    if(eventRows.has(`${p.session_id}|${p.source_file}|${p.csv_row}`))c.strokeRect(x(time(p))-5,y(p[key])-5,10,10);
+  });}
+  if($('show-stat').checked){c.fillStyle='#ffbd66';c.beginPath();valid.forEach(p=>{
+    if(p.stat_anomaly){const px=x(time(p)),py=y(p[key]);c.moveTo(px+3.5,py);c.arc(px,py,3.5,0,Math.PI*2);}
+  });c.fill();}
+  if($('show-ml').checked){c.strokeStyle='#fb83ae';c.lineWidth=2;c.beginPath();valid.forEach(p=>{
+    if(p.ml_anomaly){const px=x(time(p)),py=y(p[key]);c.moveTo(px-4,py-4);c.lineTo(px+4,py+4);c.moveTo(px+4,py-4);c.lineTo(px-4,py+4);}
+  });c.stroke();}
   if(!valid.length)c.fillText(RU.noData,60,h/2);
+  const boundary=data.full_period?.ml_boundary;
+  if(boundary&&points.some(p=>String(p.session_id)===String(boundary.session_id))){
+    const t=Date.parse(boundary.timestamp_utc);
+    if(t>=lo&&t<=hi){c.strokeStyle='#9baac0';c.lineWidth=1;c.setLineDash([4,4]);c.beginPath();c.moveTo(x(t),12);c.lineTo(x(t),h-36);c.stroke();c.setLineDash([]);c.fillStyle='#9baac0';c.fillText('Начало поиска необычных изменений',Math.max(52,Math.min(x(t)+6,w-330)),18);}
+  }
   plotInfo[id]={rows:valid,x,y,width:w};
 }
 function drawAll(){draw('mspt','mspt_avg');draw('tps','tps_1m');drawNavigator();$('period').textContent=points.length?`${date(lo)} — ${date(hi)}`:RU.noData;$('tooltip').hidden=true;}
@@ -215,15 +226,16 @@ function renderInterpretation(){
  const r=data.interpretation;if(!r){$('analysis-conclusion').textContent='Сводка интерпретации недоступна для этого отчёта.';return;}
  const metric=m=>m.evaluated?`${num(m.count,0)} из ${num(m.evaluated,0)} (${num(m.percent)} %)`:'Данные недоступны';
  const target=$('result-cards');
- for(const [label,m] of [['Необычные изменения',r.ml],['Резкие изменения MSPT',r.statistical]]){
-  const card=el('div',undefined,target,'card');el('span',label+' · весь анализируемый период',card);el('strong',metric(m),card);
+ const full=data.full_period,stat=full?{count:full.stat_anomalies,evaluated:full.stat_evaluable_measurements,percent:full.stat_evaluable_measurements?100*full.stat_anomalies/full.stat_evaluable_measurements:null}:r.statistical;
+ for(const [label,m] of [['Необычные изменения · участок поиска',r.ml],['Резкие изменения MSPT · вся история',stat]]){
+  const card=el('div',undefined,target,'card');el('span',label,card);el('strong',metric(m),card);
  }
  $('regime-note').textContent=r.coverage_warnings.length?'В этом периоде сервер работал в условиях, которые редко встречались ранее. Необычные изменения могут быть связаны с онлайном игроков, а не с лагами.':'';
  const scope=$('period-scope'),q=data.data_quality;
  if(q?.split?.method==='chronological')el('span',`Полный период наблюдения: ${measurements(q.measurements)}. `,scope);
  else el('span','Источники обучения и проверки — отдельные CSV; их периоды могут пересекаться. ',scope);
- el('span',`Период обучения: ${measurements(r.train_measurements)}. Проверочный период: ${measurements(r.test_measurements)}. Графики и ML-результаты относятся к проверочному периоду. `,scope);
- el('span',`Измерения с меткой хотя бы одного детектора: ${num(r.unique,0)}; совпадения: ${num(r.both,0)}.`,scope);
+ el('span',`Период обучения: ${measurements(r.train_measurements)}. Проверочный период: ${measurements(r.test_measurements)}. Графики, показатели и пороговые события относятся ${data.full_period?.scope==='pilot_full'?'ко всей истории':'к проверочному файлу'}. ML-результаты — только к проверочному периоду. `,scope);
+ el('span',`Только TEST: измерения с меткой хотя бы одного детектора: ${num(r.unique,0)}; совпадения: ${num(r.both,0)}.`,scope);
  const wrap=el('div',undefined,$('training-coverage'),'table-wrap'),table=el('table',undefined,wrap),head=el('tr',undefined,el('thead',undefined,table));
  ['Режим','Обучение (TRAIN)','Проверка (TEST)','ML-отклонения TEST'].forEach(v=>el('th',v,head));
  const body=el('tbody',undefined,table);
