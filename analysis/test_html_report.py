@@ -153,6 +153,20 @@ class HtmlReportTest(unittest.TestCase):
         self.assertRegex(template, r'<input id="show-ml" type="checkbox">')
         self.assertIn('Как пользоваться графиком', template)
 
+    def test_health_core_and_reduced_motion(self):
+        css=(ASSETS/'style.css').read_text(encoding='utf8')
+        template=(ASSETS/'template.html').read_text(encoding='utf8')
+        self.assertEqual(template.count('class="energy-core"'),1)
+        self.assertIn('aria-hidden="true"',template)
+        for state in ['GREEN','YELLOW','RED']:
+            self.assertIn('data-health="'+state+'"',css)
+        self.assertIn('prefers-reduced-motion:reduce',css)
+        self.assertIn('animation:none!important',css)
+        self.assertIn('translate3d(-70px,60px,-360px)',css)
+        self.assertIn('translate3d(0,0,0) scale(1)',css)
+        self.assertIn('right:calc(15% - 65px)',css)
+        self.assertIn('pointer-events:none',css)
+
     def test_navigator_and_typography(self):
         html = render_html({"points": [], "events": []})
         self.assertNotIn('id="from"', html)

@@ -439,3 +439,18 @@ section {margin-top:24px}
 #navigator {height:90px}
 
 #cards {grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+/* Health illumination is separate from chart marker colours. No animation loop in JS. */
+:root {--health-rgb:155,170,192}
+:root[data-health="GREEN"] {--health-rgb:80,220,155}
+:root[data-health="YELLOW"] {--health-rgb:240,184,70}
+:root[data-health="RED"] {--health-rgb:235,85,100}
+body {background:radial-gradient(ellipse at 85% 100px,rgba(var(--health-rgb),.13),transparent 45%),var(--bg);overflow-x:clip}
+main {position:relative;z-index:1}
+.energy-core {position:fixed;right:calc(15% - 65px);top:70px;width:130px;height:130px;z-index:0;pointer-events:none;animation:core-arrival 2.1s cubic-bezier(.16,.7,.25,1) both}
+.energy-core span {position:absolute;inset:12%;border-radius:50%;background:radial-gradient(circle at 39% 33%,#fff 0%,rgba(var(--health-rgb),.95) 24%,rgba(var(--health-rgb),.35) 62%,transparent 74%);box-shadow:inset -9px -12px 18px rgba(0,0,0,.4),0 0 28px rgba(var(--health-rgb),.45),0 0 75px rgba(var(--health-rgb),.18)}
+.energy-core::before,.energy-core::after {content:"";position:absolute;inset:0;border-radius:50%;border:1px solid rgba(var(--health-rgb),.35);transform:rotate(-28deg) scaleY(.48);box-shadow:0 0 20px rgba(var(--health-rgb),.15)}
+.energy-core::after {inset:-16%;transform:rotate(42deg) scaleY(.66);opacity:.35}
+#health-label {color:rgb(var(--health-rgb));font-weight:650;margin-bottom:0}
+@keyframes core-arrival {0%{transform:perspective(600px) translate3d(-70px,60px,-360px) scale(.15) rotate(-40deg);opacity:.05}45%{transform:perspective(600px) translate3d(30px,-20px,-140px) scale(.55) rotate(-15deg);opacity:.5}80%{transform:perspective(600px) translate3d(-8px,-7px,-30px) scale(.92);opacity:.9}100%{transform:translate3d(0,0,0) scale(1);opacity:1}}
+@media(max-width:600px){.energy-core {right:14px;top:25px;width:75px;height:75px;opacity:.7}}
+@media(prefers-reduced-motion:reduce){.energy-core {animation:none!important;transform:none!important;opacity:1}}

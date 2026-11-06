@@ -114,3 +114,7 @@ assert.equal(run('plotInfo.mspt.rows.length'),13586);assert.equal(run('plotInfo.
 assert.equal(get('ml-list').children[0].children[0].children[1].children.length,50);
 assert.equal(get('ml-technical').children[0].children[0].children[1].children.length,50);
 get('mspt').calls=[];get('tps').calls=[];const toggled=Date.now();get('show-ml').checked=true;get('show-ml').listeners.change();console.log(JSON.stringify({canvasDoubleRows:13586,refreshMs,markerToggleMs:Date.now()-toggled}));
+
+run("data.event_insights={ml_episodes:Array.from({length:12},(_,i)=>({session_id:1,start_utc:data.points[i].timestamp_utc,last_observed_utc:data.points[i].timestamp_utc,measurements:1,single_observation:true,peak_mspt:3,min_tps:20,mean_mspt:3,players_min:1,players_max:1,context:{},observed_facts:[],suggested_checks:[],limitation:'Причина не установлена'}))}");
+get('session').listeners.change();assert.equal(get('ml-list').children.length,9);assert.equal(get('more').hidden,false);get('more').listeners.click();assert.equal(get('ml-list').children.length,13);assert.equal(get('more').hidden,true);
+get('session').value='2';get('session').listeners.change();assert.equal(get('ml-list').children[0].textContent,'Необычных периодов не обнаружено');
