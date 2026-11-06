@@ -3,8 +3,8 @@
 const RU = {
   high_mspt:'Высокий MSPT',low_tps:'Низкий TPS',elevated_mspt:'Повышенный MSPT',
   measurements:'Измерения',sessions:'Сессии сервера',mean:'Средний MSPT',peak:'Максимальный MSPT',
-  minimum:'Минимальный TPS',ml:'ML-аномалии',stat:'Статистические аномалии',episodes:'Пороговые эпизоды',
-  noEvents:'Событий не обнаружено',noML:'ML-аномалий не обнаружено',noData:'Нет данных в выбранном диапазоне',
+  minimum:'Минимальный TPS',ml:'ML-отклонения',stat:'Статистические отклонения',episodes:'Пороговые эпизоды',
+  noEvents:'Событий не обнаружено',noML:'ML-отклонений не обнаружено',noData:'Нет данных в выбранном диапазоне',
   unknown:'Данные недоступны',session:'Сессия',rows:'Исходные строки CSV',file:'Файл',
   loaded_chunks_delta:'Изменение числа загруженных чанков',entities_delta:'Изменение числа сущностей',
   gc_count_delta:'Прирост числа сборок GC',gc_time_delta_ms:'Прирост накопленного времени GC',heap_used_ratio:'Доля использованной выделенной памяти JVM',
@@ -12,7 +12,7 @@ const RU = {
   single:'Одиночное наблюдение',span:'Наблюдаемый охват',sum:'Сумма доступных интервальных приростов',
   net:'Сумма знаковых изменений',positive:'Максимальный положительный прирост',coverage:'Доступно наблюдений',
   score:'Оценка модели',time:'Время, UTC',start:'Начало',last:'Последнее наблюдение',
-  more:'Показать ещё',allML:'Показаны все ML-аномалии'
+  more:'Показать ещё',allML:'Показаны все ML-отклонения'
 };
 const data=JSON.parse(document.getElementById('report-data').textContent);
 const $=id=>document.getElementById(id), num=(n,d=2)=>n===null||n===undefined||!Number.isFinite(Number(n))?'—':new Intl.NumberFormat('ru-RU',{maximumFractionDigits:d}).format(n);
@@ -96,9 +96,9 @@ function draw(id,key){
   const eventRows=new Set(events.flatMap(e=>e.source_rows.map(r=>`${e.session_id}|${e.source_file}|${r}`)));
   valid.forEach(p=>{const px=x(time(p)),py=y(p[key]);
     c.fillStyle='#7faeff';c.beginPath();c.arc(px,py,1.7,0,Math.PI*2);c.fill();
-    if(eventRows.has(`${p.session_id}|${p.source_file}|${p.csv_row}`)){c.strokeStyle='#77e1bb';c.lineWidth=1.6;c.strokeRect(px-5,py-5,10,10);}
-    if(p.stat_anomaly){c.fillStyle='#ffbd66';c.beginPath();c.arc(px,py,3.5,0,Math.PI*2);c.fill();}
-    if(p.ml_anomaly){c.strokeStyle='#fb83ae';c.lineWidth=2;c.beginPath();c.moveTo(px-4,py-4);c.lineTo(px+4,py+4);c.moveTo(px+4,py-4);c.lineTo(px-4,py+4);c.stroke();}
+    if($('show-events').checked&&eventRows.has(`${p.session_id}|${p.source_file}|${p.csv_row}`)){c.strokeStyle='#77e1bb';c.lineWidth=1.6;c.strokeRect(px-5,py-5,10,10);}
+    if($('show-stat').checked&&p.stat_anomaly){c.fillStyle='#ffbd66';c.beginPath();c.arc(px,py,3.5,0,Math.PI*2);c.fill();}
+    if($('show-ml').checked&&p.ml_anomaly){c.strokeStyle='#fb83ae';c.lineWidth=2;c.beginPath();c.moveTo(px-4,py-4);c.lineTo(px+4,py+4);c.moveTo(px+4,py-4);c.lineTo(px-4,py+4);c.stroke();}
   });
   if(!valid.length)c.fillText(RU.noData,60,h/2);
   plotInfo[id]={rows:valid,x,y,width:w};
@@ -175,7 +175,7 @@ for(const [id,mode] of [['nav-left','left'],['nav-pan','pan'],['nav-right','righ
     const nearest=info.rows.reduce((best,p)=>{const distance=Math.hypot(info.x(time(p))-px,info.y(p[id==='mspt'?'mspt_avg':'tps_1m'])-py);return !best||distance<best.distance?{p,distance}:best;},null);
     if(!nearest){$('tooltip').hidden=true;return;}
     const p=nearest.p,signals=events.filter(v=>v.session_id===p.session_id&&v.source_file===p.source_file&&v.source_rows.includes(p.csv_row)).map(v=>RU[v.signal]);
-    $('tooltip').textContent=[date(p.timestamp_utc),`${RU.session}: ${p.session_id} · ${RU.rows}: ${num(p.csv_row,0)}`,`MSPT: ${num(p.mspt_avg)} мс · TPS: ${num(p.tps_1m)}`,p.ml_anomaly?`${RU.ml} · ${RU.score}: ${num(p.anomaly_score,6)}`:null,p.stat_anomaly?RU.stat:null,...signals].filter(Boolean).join('\n');
+    $('tooltip').textContent=[date(p.timestamp_utc),`${RU.session}: ${p.session_id} · ${RU.rows}: ${num(p.csv_row,0)}`,`MSPT: ${num(p.mspt_avg,3)} мс · TPS: ${num(p.tps_1m)}`,p.ml_anomaly?`${RU.ml} · ${RU.score}: ${num(p.anomaly_score,6)}`:null,p.stat_anomaly?`${RU.stat} · Локальный порог: ${num(p.rolling_threshold,3)} мс · Превышение: ${num(p.excess_mspt,3)} мс`:null,...signals].filter(Boolean).join('\n');
     $('tooltip').hidden=false;$('tooltip').style.left=Math.max(8,Math.min(e.clientX+16,window.innerWidth-370))+'px';$('tooltip').style.top=Math.max(8,Math.min(e.clientY+16,window.innerHeight-$('tooltip').offsetHeight-8))+'px';
   }
   canvas.addEventListener('pointermove',inspect);canvas.addEventListener('click',inspect);canvas.addEventListener('pointerleave',()=>$('tooltip').hidden=true);
@@ -203,3 +203,29 @@ function renderQuality(){
  list('Ограничения',q.limitations,target);
 }
 renderQuality();
+
+for(const id of ['show-events','show-stat','show-ml'])$(id).addEventListener('change',drawAll);
+function renderInterpretation(){
+ const r=data.interpretation;if(!r){$('analysis-conclusion').textContent='Сводка интерпретации недоступна для этого отчёта.';return;}
+ const metric=m=>m.evaluated?`${num(m.count,0)} из ${num(m.evaluated,0)} (${num(m.percent)} %)`:'Данные недоступны';
+ const target=$('result-cards');
+ for(const [label,value,description] of [
+  ['Пороговые события',num(r.performance_events,0),'Эпизоды, удовлетворяющие настроенным условиям повышенной нагрузки или снижения TPS. Их число не равно числу независимых проблем.'],
+  ['ML-отклонения',metric(r.ml),'Необычные состояния относительно обучающих данных.'],
+  ['Статистические отклонения',metric(r.statistical),'MSPT выше среднего шести предыдущих измерений плюс три стандартных отклонения.']]){
+  const card=el('div',undefined,target,'card');el('span',label,card);el('strong',value,card);el('p',description,card);
+ }
+ $('analysis-conclusion').textContent=r.conclusion;
+ const scope=$('period-scope'),q=data.data_quality;
+ if(q?.split?.method==='chronological')el('span',`Полный период наблюдения: ${measurements(q.measurements)}. `,scope);
+ else el('span','Источники обучения и проверки — отдельные CSV; их периоды могут пересекаться. ',scope);
+ el('span',`Период обучения: ${measurements(r.train_measurements)}. Проверочный период: ${measurements(r.test_measurements)}. Графики и ML-результаты относятся к проверочному периоду. `,scope);
+ el('span',`Измерения с меткой хотя бы одного детектора: ${num(r.unique,0)}; совпадения: ${num(r.both,0)}.`,scope);
+ const wrap=el('div',undefined,$('training-coverage'),'table-wrap'),table=el('table',undefined,wrap),head=el('tr',undefined,el('thead',undefined,table));
+ ['Режим','Обучение (TRAIN)','Проверка (TEST)','ML-отклонения TEST'].forEach(v=>el('th',v,head));
+ const body=el('tbody',undefined,table);
+ r.coverage.forEach(row=>{const tr=el('tr',undefined,body);[row.label,metric(row.train),metric(row.test),metric(row.test_ml)].forEach(v=>el('td',v,tr));});
+ if(r.coverage_warnings.length)list('Осторожная интерпретация',r.coverage_warnings,$('training-coverage'));
+ el('p',`Диагностическая эвристика: режим есть в TEST, но составляет менее ${num(r.weak_coverage_percent)} % TRAIN. Это не универсальный порог репрезентативности и не оценка точности ML.`, $('training-coverage'),'muted');
+}
+renderInterpretation();

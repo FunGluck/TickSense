@@ -414,3 +414,9 @@ h2, h3, h4 {
         line-height: 1.18
     }
 }
+
+.marker-controls {display:flex;flex-wrap:wrap;gap:1rem;border:1px solid #283246;border-radius:12px;padding:1rem;margin:1rem 0}
+.marker-controls label {display:flex;align-items:center;gap:.5rem;cursor:pointer}
+.marker-controls input {accent-color:#77e1bb}
+#result-cards .card strong {font-size:1.4rem}
+#result-cards .card p {margin-bottom:0}

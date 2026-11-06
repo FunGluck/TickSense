@@ -74,7 +74,7 @@ class HtmlReportTest(unittest.TestCase):
                 write_html_report(frame, report, path)
                 html = path.read_text(encoding="utf-8")
                 self.assertIn('<html lang="ru">', html)
-                for label in ("Обзор", "События производительности", "ML-аномалии", "Сессии сервера", "Средний MSPT", "Максимальный MSPT", "Минимальный TPS"):
+                for label in ("Обзор", "События производительности", "ML-отклонения", "Сессии сервера", "Средний MSPT", "Максимальный MSPT", "Минимальный TPS"):
                     self.assertIn(label, html)
                 self.assertNotIn(str(Path(folder).resolve()), html)
                 self.assertEqual(report, original)
