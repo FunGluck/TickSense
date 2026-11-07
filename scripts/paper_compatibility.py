@@ -15,8 +15,21 @@ import urllib.request
 import urllib.parse
 from datetime import datetime, timezone
 
-ROOT = Path(r"C:\Users\Admin\Desktop\Development\TickSense-Compatibility")
 REPO = Path(__file__).resolve().parents[1]
+
+
+def compatibility_root(repo, override=None):
+    # Support both Development/TickSense and Development/TickSense/TickSense.
+    parent = repo.parent
+    if parent.name.casefold() == repo.name.casefold():
+        parent = parent.parent
+    root = Path(os.path.abspath(override)) if override is not None else parent / 'TickSense-Compatibility'
+    if root.resolve().is_relative_to(repo.resolve()):
+        raise ValueError('Compatibility workdir must be outside the repository')
+    return root
+
+
+ROOT = compatibility_root(REPO)
 BUILDS = json.loads(Path(__file__).with_name("paper-builds.json").read_text())
 FIELDS = 'timestamp_utc,elapsed_ms,tps_1m,mspt_avg,players_online,jvm_heap_used_bytes,loaded_chunks,entities_total,block_entities_total,jvm_heap_committed_bytes,gc_collection_count,gc_collection_time_ms'.split(',')
 ERRORS = re.compile(r'NoSuchMethodError|NoClassDefFoundError|UnsupportedClassVersionError|IllegalPluginAccessException|Asynchronous .*|Metrics collection stopped|CSV shutdown exceeded|Dropped snapshots|Session dropped snapshots|Exception.*TickSense|Error occurred while (?:enabling|disabling) TickSense|Could not load.*TickSense', re.I)
@@ -159,8 +172,8 @@ def run_session(folder, server, java, label, *, plugin_version='0.8.1-compat-tes
     return {'status':'PASS','console_log':str(log),'normal_exit':True,'plugin_loaded':True}
 
 
-def save_report(report, root=ROOT):
-    target=safe_dir(root/'results')
+def save_report(report, target=ROOT/'results'):
+    target=safe_dir(target)
     (target/'compatibility-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     lines=['# TickSense compatibility experiment','', '| Paper | Build | Status | Measurements | Note |','|---|---:|---|---:|---|']
     for result in report['versions']:
@@ -175,10 +188,12 @@ def main():
     parser.add_argument('--jar',type=Path,required=True)
     parser.add_argument('--java',default='java')
     parser.add_argument('--series',choices=['1.21','26'],default='1.21')
+    parser.add_argument('--workdir',type=Path,help='Compatibility directory outside the repository')
     parser.add_argument('--resume',action='store_true',help='Reuse only previously recorded normally stopped first runs')
     args=parser.parse_args()
     modern=args.series=='26'
-    root=REPO/'.gradle/compat26' if modern else ROOT
+    root=compatibility_root(REPO,args.workdir)
+    results=root/'results'/'26' if modern else root/'results'
     builds=json.loads(Path(__file__).with_name('paper-builds-26.json').read_text()) if modern else BUILDS
     plugin_version='0.8.1-pilot' if modern else '0.8.1-compat-test'
     java_major=25 if modern else 21
@@ -188,7 +203,7 @@ def main():
     if not re.search(rf'version "{java_major}\.',java): raise ValueError(f'Use Java {java_major} for this fixed test matrix')
     report={'generated_utc':datetime.now(timezone.utc).isoformat(),'java':java,'ticksense_sha256':digest(args.jar),'versions':[]}
     previous={}
-    old_report=root/'results/compatibility-report.json'
+    old_report=results/'compatibility-report.json'
     if args.resume and old_report.is_file():
         old=json.loads(old_report.read_text(encoding='utf-8'))
         if old['ticksense_sha256']!=report['ticksense_sha256']: raise ValueError('Resume plugin SHA mismatch')
@@ -206,7 +221,7 @@ def main():
             report['versions'].append(result)
             if abort:
                 result.update(status='BLOCKED',reason='Previous test process could not be stopped; no further starts')
-                save_report(report,root)
+                save_report(report,results)
                 continue
             try:
                 folder,server=prepare(build,args.jar,index,root)
@@ -246,7 +261,7 @@ def main():
                 result.update(status='BLOCKED',reason=str(error),errors=[str(error)])
             except Exception as error:
                 result.update(status='FAIL' if args.mode=='Run' else 'BLOCKED',reason=str(error),errors=[str(error)])
-            save_report(report,root)
+            save_report(report,results)
     finally:
         if not abort: lock.unlink()
     print(json.dumps(report,ensure_ascii=False,indent=2))

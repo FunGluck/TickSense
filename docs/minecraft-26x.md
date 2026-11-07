@@ -28,10 +28,10 @@ Gradle использует toolchain Java 21 и `compileOnly` Paper API 1.21.1.
 .\.venv\Scripts\python.exe scripts/paper_compatibility.py Prepare --series 26 --jar build/libs/TickSense-0.8.1-pilot.jar
 ```
 
-Каталоги `.gradle/compat26/paper-26.3`, `paper-26.2`, `paper-26.1.2` изолированы от прежней матрицы и пользовательских миров. После отдельного принятия Minecraft EULA владельцем для каждого окружения добавьте в него `eula.txt` с `eula=true`. Harness проверяет файлы, но никогда не принимает EULA сам.
+Обе матрицы используют внешний каталог `TickSense-Compatibility` рядом с проектом. Для вложенного checkout `Development/TickSense/TickSense` это `Development/TickSense-Compatibility`. Paper 26.x занимает подпапки `paper-26.3`, `paper-26.2` и `paper-26.1.2`. Путь можно переопределить аргументом `--workdir`; каталог должен находиться вне репозитория. После отдельного принятия Minecraft EULA владельцем для каждого окружения добавьте в него `eula.txt` с `eula=true`. Harness проверяет файлы, но никогда не принимает EULA сам.
 
 ```powershell
 .\.venv\Scripts\python.exe scripts/paper_compatibility.py Run --series 26 --jar build/libs/TickSense-0.8.1-pilot.jar
 ```
 
-Последовательные тесты запускают пустой сервер дважды на локальном адресе, завершают командой `stop`, проверяют CSV v2 и сброс `elapsed_ms`, затем запускают существующий анализатор для HTML. Логи и отчёт остаются в `.gradle/compat26`. Матрица 1.21.x остаётся режимом по умолчанию. Подключение игроков, управляемая нагрузка, UTC-ротация и накладные расходы этим smoke-тестом не покрываются.
+Последовательные тесты запускают пустой сервер дважды на локальном адресе, завершают командой `stop`, проверяют CSV v2 и сброс `elapsed_ms`, затем запускают существующий анализатор для HTML. Логи остаются в папках серверов, сводка 26.x — в `TickSense-Compatibility/results/26/`. Сводка 1.21.x остаётся в `results/`. Матрица 1.21.x остаётся режимом по умолчанию. Подключение игроков, управляемая нагрузка, UTC-ротация и накладные расходы этим smoke-тестом не покрываются.

@@ -3,7 +3,7 @@ import csv
 from pathlib import Path
 import tempfile
 import unittest
-from paper_compatibility import FIELDS, validate_csv, accepted, digest
+from paper_compatibility import FIELDS, validate_csv, accepted, digest, compatibility_root
 
 
 class HarnessTest(unittest.TestCase):
@@ -51,6 +51,20 @@ class HarnessTest(unittest.TestCase):
     def test_sha256(self):
         self.path.write_bytes(b'abc')
         self.assertEqual(digest(self.path),'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
+
+    def test_compatibility_root_checkout_layouts(self):
+        repo = self.root/'TickSense'
+        expected = self.root/'TickSense-Compatibility'
+        self.assertEqual(compatibility_root(repo), expected)
+        self.assertEqual(compatibility_root(repo/'TickSense'), expected)
+
+    def test_workdir_override_must_be_external(self):
+        repo = self.root/'TickSense'
+        custom = self.root/'other directory'
+        self.assertEqual(compatibility_root(repo, custom), custom)
+        for path in [repo, repo/'.gradle/compat26']:
+            with self.assertRaises(ValueError):
+                compatibility_root(repo, path)
 
 
 if __name__=='__main__': unittest.main()

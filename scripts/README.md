@@ -39,3 +39,5 @@ Java Instant может записывать 9 знаков после деся�
 ```powershell
 python -m unittest discover -s scripts -p "test_*.py" -v
 ```
+
+Корень матриц 1.21.x и 26.x по умолчанию — внешний `TickSense-Compatibility` рядом с проектом. Для структуры `Development/TickSense/TickSense` используется `Development/TickSense-Compatibility`. Переопределение — `--workdir` в Python CLI или `-WorkDir` в PowerShell-обёртке. Корень внутри checkout отклоняется. Существующие каталоги серверов используются повторно. Сводка 26.x записывается отдельно в `results/26/`. [Инструкция для Paper 26.x](../docs/minecraft-26x.md).
