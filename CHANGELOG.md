@@ -1,5 +1,9 @@
 # Изменения TickSense
 
+## Дополнительная проверка совместимости v0.8.1
+
+- Тот же JAR, собранный на Java 21, проверен с подключённым игроком на Paper 26.1.2 #74, 26.2 #135 и 26.3 #244 под Java 25. [Результаты](docs/minecraft-26x.md).
+
 ## v0.8.1 — Compatibility Pilot (Pre-release)
 
 - Paper API baseline снижен до 1.21.1 при сохранении Java target 21.
