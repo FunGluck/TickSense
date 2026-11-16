@@ -66,7 +66,7 @@ const width=run('hi-lo');
 nav.listeners.pointerdown(pointer(run('navX((lo+hi)/2)')));
 nav.listeners.pointermove(pointer(run('navX((lo+hi)/2+3000)')));nav.listeners.pointerup(pointer(0));
 assert.equal(run('hi-lo'),width);assert.equal(run('lo-fullLo'),9000);
-assert.equal(run('plotInfo.mspt.rows.length'),run('plotInfo.tps.rows.length'));
+assert.equal(run('(plotInfo.mspt.end-plotInfo.mspt.start)'),run('(plotInfo.tps.end-plotInfo.tps.start)'));
 assert.equal(run('plotInfo.mspt.x(lo)'),run('plotInfo.tps.x(lo)'));
 run('changeWindow("pan",999999)');assert.equal(run('hi'),run('fullHi'));assert.equal(run('hi-lo'),width);
 run('changeWindow("pan",-999999)');assert.equal(run('lo'),run('fullLo'));assert.equal(run('hi-lo'),width);
@@ -110,13 +110,13 @@ assert.ok(paths.some(path=>path.filter(c=>c.key==='moveTo').length===2&&path.fil
 // Large history: preserve every point, keep both tables paginated, no point DOM nodes.
 run("data.points.splice(0,data.points.length,...Array.from({length:13586},(_,i)=>({timestamp_utc:new Date(Date.UTC(2026,10,5)+i*10000).toISOString(),session_id:1,mspt_avg:i===100?118:3,tps_1m:20,ml_anomaly:i>=9510,stat_anomaly:i===100,anomaly_score:i>=9510?-.1:null})));data.events.splice(0)");
 get('mspt').calls=[];get('tps').calls=[];const started=Date.now();get('session').listeners.change();const refreshMs=Date.now()-started;
-assert.equal(run('plotInfo.mspt.rows.length'),13586);assert.equal(run('plotInfo.tps.rows.length'),13586);
+assert.equal(run('(plotInfo.mspt.end-plotInfo.mspt.start)'),13586);assert.equal(run('(plotInfo.tps.end-plotInfo.tps.start)'),13586);
 assert.equal(get('ml-list').children[0].children[0].children[1].children.length,50);
 assert.equal(get('ml-technical').children[0].children[0].children[1].children.length,50);
 get('mspt').calls=[];get('tps').calls=[];const toggled=Date.now();get('show-ml').checked=true;get('show-ml').listeners.change();console.log(JSON.stringify({canvasDoubleRows:13586,refreshMs,markerToggleMs:Date.now()-toggled}));
 
 run("data.event_insights={ml_episodes:Array.from({length:12},(_,i)=>({session_id:1,start_utc:data.points[i].timestamp_utc,last_observed_utc:data.points[i].timestamp_utc,measurements:1,single_observation:true,peak_mspt:3,min_tps:20,mean_mspt:3,players_min:1,players_max:1,context:{},observed_facts:[],suggested_checks:[],limitation:'Причина не установлена'}))}");
-get('session').listeners.change();assert.equal(get('ml-list').children.length,9);assert.equal(get('more').hidden,false);get('more').listeners.click();assert.equal(get('ml-list').children.length,13);assert.equal(get('more').hidden,true);
+get('session').listeners.change();assert.equal(get('ml-list').children.length,9);assert.equal(get('more').hidden,false);get('more').listeners.click();assert.equal(get('ml-list').children.length,5);assert.equal(get('more').hidden,true);
 get('session').value='2';get('session').listeners.change();assert.equal(get('ml-list').children[0].textContent,'Необычных периодов не обнаружено');
 
 // Low TPS first with overlapping high MSPT, unrelated high next, elevated last.
@@ -126,3 +126,18 @@ assert.deepEqual(JSON.parse(run('JSON.stringify(prioritizePerformanceEvents(even
 assert.equal(run('JSON.stringify(eventFixture)'),beforeOrder);
 assert.equal(run('new Set(prioritizePerformanceEvents(eventFixture)).size'),7);
 assert.equal(run('prioritizePerformanceEvents([]).length'),0);
+
+// Time buckets preserve both extrema and never connect across missing values or sessions.
+const samples=JSON.parse(run("JSON.stringify(sampleSeries(data.points,0,data.points.length,'mspt_avg',fullLo,fullHi,400,true).output)"));
+assert.ok(samples.some(({point})=>point.mspt_avg===118));
+assert.ok(samples.length<1601);
+get('session').value='all';get('session').listeners.change();run('lo=fullLo+990000;hi=fullLo+1010000;drawAll()');
+assert.equal(run('plotInfo.mspt.end-plotInfo.mspt.start'),3);
+assert.equal(run('plotInfo.mspt.rendered'),3);
+assert.equal(run("unpackReport({columns:{timestamp_utc:['2026-01-01T00:00:00.123456789+00:00'],mspt_avg:[12.345678901234567],tps_1m:[null]}}).points[0].mspt_avg"),12.345678901234567);
+assert.equal(run("unpackReport({columns:{timestamp_utc:['2026-01-01T00:00:00Z'],tps_1m:[null]}}).points[0].tps_1m"),null);
+run("globalThis.extrema=Array.from({length:100},(_,i)=>({timestamp_utc:new Date(i*10000).toISOString(),session_id:i<50?1:2,tps_1m:i===42?3:20,stat_anomaly:i===42}));extrema[10].tps_1m=null");
+const tpsSample=JSON.parse(run("JSON.stringify(sampleSeries(extrema,0,100,'tps_1m',0,1000000,4,true))"));
+assert.ok(tpsSample.output.some(x=>x.point.tps_1m===3));
+assert.ok(tpsSample.groups[1].some(p=>p.tps_1m===3));
+assert.equal(tpsSample.output.filter(x=>x.break).length,3);
