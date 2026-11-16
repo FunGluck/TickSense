@@ -39,8 +39,8 @@ class HistoryTest(unittest.TestCase):
             self.assertEqual(summary['ml_boundary']['timestamp_utc'],pred.timestamp_utc.iloc[0].isoformat())
             report=build_report(pred);report['full_period']=summary
             payload=prepare_html_data(history,report)
-            self.assertEqual(len(payload['points']),30)
-            self.assertIsNone(payload['points'][0]['ml_anomaly'])
+            self.assertEqual(len(payload['columns']['timestamp_utc']),30)
+            self.assertIsNone(payload['columns']['ml_anomaly'][0])
             self.assertEqual(len(payload['events']),2)  # TRAIN events are retained.
             changed=full.copy();changed.loc[test.index,'mspt_avg']=999
             causal=detect_statistical(engineer_features(changed))

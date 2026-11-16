@@ -86,8 +86,8 @@ class HtmlReportTest(unittest.TestCase):
             frame["anomaly_score"] = np.nan
             payload = prepare_html_data(frame, build_report(frame))
             self.assertEqual(payload["events"], [])
-            self.assertIsNone(payload["points"][0]["rolling_threshold"])
-            self.assertIsNone(payload["points"][0]["anomaly_score"])
+            self.assertIsNone(payload["columns"]["rolling_threshold"][0])
+            self.assertIsNone(payload["columns"]["anomaly_score"][0])
             html = render_html(payload)
             self.assertIn("Событий не обнаружено", html)
             self.assertNotIn(": NaN", html)
@@ -162,6 +162,27 @@ class HtmlReportTest(unittest.TestCase):
         self.assertIn('--health-glow:#18342f',css)
         for removed in ['energy-core','core-arrival','@keyframes','perspective(']:
             self.assertNotIn(removed,css+template)
+
+    def test_compact_payload_round_trip_preserves_precision(self):
+        import base64
+        import gzip
+        df = pd.DataFrame({
+            "timestamp_utc": [pd.Timestamp("2026-11-16T01:02:03.123456789Z")],
+            "mspt_avg": [12.345678901234567],
+            "tps_1m": [19.999999999999996],
+            "ml_anomaly": [None],
+            "source_file": [r"C:\private\day.csv"],
+        })
+        report = {"performance_events": {"episodes": []}}
+        payload = prepare_html_data(df, report)
+        self.assertEqual(payload["columns"]["source_file"], ["day.csv"])
+        self.assertEqual(payload["columns"]["timestamp_utc"], ["2026-11-16T01:02:03.123456789+00:00"])
+        self.assertIsNone(payload["columns"]["ml_anomaly"][0])
+        # Force the production compression path, including script-safe text.
+        payload["message"] = "</script>" + "x" * 2_000_000
+        html = render_html(payload)
+        block = re.search(r'<script id="report-data" type="application/octet-stream">(.*?)</script>', html, re.S)[1]
+        self.assertEqual(json.loads(gzip.decompress(base64.b64decode(block))), payload)
 
     def test_navigator_and_typography(self):
         html = render_html({"points": [], "events": []})
