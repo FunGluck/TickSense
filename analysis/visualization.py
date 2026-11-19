@@ -25,7 +25,7 @@ def plot_metrics(df: pd.DataFrame, png_path: Path | None = None, *, show: bool =
             ("stat_anomaly", "orange", "o", "Statistical anomalies"),
             ("ml_anomaly", "red", "x", "ML anomalies"),
         ]:
-            points = df[df[column]]
+            points = df[df[column].eq(True).fillna(False)]
             ax.scatter(points["timestamp_utc"], points["mspt_avg"], color=color, marker=marker, label=label, zorder=3)
 
         for timestamp in df.loc[df["online_changed"], "timestamp_utc"]:

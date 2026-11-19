@@ -21,6 +21,9 @@ datasets/*
 
 # Local reports, release artifacts and credentials
 reports/
+/models/
+*.joblib
+*.metadata.json
 dist/
 *.jar
 !gradle/wrapper/gradle-wrapper.jar

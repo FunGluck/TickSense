@@ -364,7 +364,8 @@ for(const [id,mode] of [['nav-left','left'],['nav-pan','pan'],['nav-right','righ
     }
     if(!best){$('tooltip').hidden=true;return;}
     const p=best,signals=eventIndex.get(eventKey(p.session_id,p.source_file,p.csv_row))??[];
-    $('tooltip').textContent=[date(p.timestamp_utc),`${RU.session}: ${p.session_id} · Игроки: ${num(p.players_online,0)}`,`MSPT: ${num(p.mspt_avg,3)} мс · TPS: ${num(p.tps_1m)}`,p.ml_anomaly?RU.ml:null,p.stat_anomaly?`${RU.stat} · Локальный порог: ${num(p.rolling_threshold,3)} мс · Превышение: ${num(p.excess_mspt,3)} мс`:null,...signals].filter(Boolean).join('\n');
+    const mlLabel=p.ml_anomaly?RU.ml:data.ml_model&&p.ml_anomaly==null?'ML-оценка недоступна':null;
+    $('tooltip').textContent=[date(p.timestamp_utc),`${RU.session}: ${p.session_id} · Игроки: ${num(p.players_online,0)}`,`MSPT: ${num(p.mspt_avg,3)} мс · TPS: ${num(p.tps_1m)}`,mlLabel,p.stat_anomaly?`${RU.stat} · Локальный порог: ${num(p.rolling_threshold,3)} мс · Превышение: ${num(p.excess_mspt,3)} мс`:null,...signals].filter(Boolean).join('\n');
     $('tooltip').hidden=false;$('tooltip').style.left=Math.max(8,Math.min(e.clientX+16,window.innerWidth-370))+'px';$('tooltip').style.top=Math.max(8,Math.min(e.clientY+16,window.innerHeight-$('tooltip').offsetHeight-8))+'px';
   }
   canvas.addEventListener('pointermove',inspect);canvas.addEventListener('click',inspect);canvas.addEventListener('pointerleave',()=>$('tooltip').hidden=true);
@@ -391,7 +392,7 @@ function renderQuality(){
  const cards=el('div',undefined,target,'cards');
  [['Исходные CSV',q.source_csv_count],['Измерения',q.measurements],['Сессии сервера',q.sessions],['Длительные разрывы',q.long_gaps],['Максимальный интервал, с',q.max_interval_seconds]].forEach(([label,value])=>{const c=el('div',undefined,cards,'card');el('span',label,c);el('strong',num(value),c);});
  if(q.split?.method==='chronological')el('p',`Хронологическое разделение: обучение — ${measurements(q.split.training_measurements)}, проверка — ${measurements(q.split.evaluation_measurements)}. Последнее обучение: ${date(q.split.training_last_utc)}; начало проверки: ${date(q.split.evaluation_first_utc)}. Графики и детекторы показывают проверочный период.`,target);
- else el('p','Обучение и проверка — отдельные CSV. Качество данных показано для проверочного файла.',target);
+ else if(q.split?.method!=='saved_model')el('p','Обучение и проверка — отдельные CSV. Качество данных показано для проверочного файла.',target);
  if(q.warnings.length)list('Предупреждения',q.warnings,target);
  list('Ограничения',q.limitations,target);
 }
@@ -403,11 +404,21 @@ function renderInterpretation(){
  const metric=m=>m.evaluated?`${num(m.count,0)} из ${num(m.evaluated,0)} (${num(m.percent)} %)`:'Данные недоступны';
  const target=$('result-cards');
  const full=data.full_period,stat=full?{count:full.stat_anomalies,evaluated:full.stat_evaluable_measurements,percent:full.stat_evaluable_measurements?100*full.stat_anomalies/full.stat_evaluable_measurements:null}:r.statistical;
- for(const [label,m] of [['Необычные изменения · участок поиска',r.ml],['Резкие изменения MSPT · вся история',stat]]){
+ const saved=data.ml_model;
+ for(const [label,m] of [[saved?'Необычные изменения · вся история':'Необычные изменения · участок поиска',r.ml],['Резкие изменения MSPT · вся история',stat]]){
   const card=el('div',undefined,target,'card');el('span',label,card);el('strong',metric(m),card);
  }
  $('regime-note').textContent=r.coverage_warnings.length?'В этом периоде сервер работал в условиях, которые редко встречались ранее. Необычные изменения могут быть связаны с онлайном игроков, а не с лагами.':'';
  const scope=$('period-scope'),q=data.data_quality;
+ if(saved){
+  el('p','Сохранённая ML-модель',scope);
+  const technical=$('training-coverage');
+  $('training-coverage-heading').textContent='Сведения о модели';
+  el('p',`Модель: ${saved.model_type} · Версия: ${saved.version} · Сервер-источник: ${saved.server_id}`,technical);
+  el('p',`Обучение: ${date(saved.trained_at_utc)} · ${measurements(saved.training_measurements)}`,technical);
+  el('p',`За весь период ML оценила ${measurements(saved.evaluated_measurements)}. Без ML-оценки: ${measurements(saved.unscored_measurements)}.`,technical);
+  return;
+ }
  if(q?.split?.method==='chronological')el('span',`Полный период наблюдения: ${measurements(q.measurements)}. `,scope);
  else el('span','Источники обучения и проверки — отдельные CSV; их периоды могут пересекаться. ',scope);
  el('span',`Период обучения: ${measurements(r.train_measurements)}. Проверочный период: ${measurements(r.test_measurements)}. Графики, показатели и пороговые события относятся ${data.full_period?.scope==='pilot_full'?'ко всей истории':'к проверочному файлу'}. ML-результаты — только к проверочному периоду. `,scope);
