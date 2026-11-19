@@ -61,6 +61,7 @@ def prepare_html_data(df: pd.DataFrame, report: dict) -> dict:
         "performance_health": report.get("performance_health"),
         "interpretation": report.get("interpretation"),
         "data_quality": report.get("data_quality"),
+        **({"ml_model": report["ml_model"]} if "ml_model" in report else {}),
         "events": events,
     })
     return {**metadata, "columns": points}

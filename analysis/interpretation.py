@@ -13,6 +13,9 @@ def _metric(count, denominator):
 
 def interpret_results(training, evaluation, events):
     """Summarize actual evaluable predictions; missing predictions stay unknown."""
+    saved_model = training is None
+    if saved_model:
+        training = evaluation.iloc[:0]
     def flags(column):
         return evaluation.get(column, pd.Series(index=evaluation.index, dtype=object))
 
@@ -20,10 +23,11 @@ def interpret_results(training, evaluation, events):
     ml_valid = flags('ml_anomaly').notna() & np.isfinite(scores)
     stat_valid = flags('stat_anomaly').notna() & pd.to_numeric(
         flags('rolling_threshold'), errors='coerce').notna()
-    ml = flags('ml_anomaly').fillna(False).astype(bool) & ml_valid
-    stat = flags('stat_anomaly').fillna(False).astype(bool) & stat_valid
+    ml = flags('ml_anomaly').eq(True).fillna(False) & ml_valid
+    stat = flags('stat_anomaly').eq(True).fillna(False) & stat_valid
     coverage, warnings = [], []
-    for key, label, empty in [('empty', 'Пустой сервер', True), ('active', 'С игроками', False)]:
+    regimes = [('empty', 'Пустой сервер', True), ('active', 'С игроками', False)]
+    for key, label, empty in [] if saved_model else regimes:
         def regime(frame):
             values = pd.to_numeric(frame.get('players_online', pd.Series(index=frame.index, dtype=float)), errors='coerce')
             return values.eq(0) if empty else values.gt(0)
@@ -50,13 +54,14 @@ def interpret_results(training, evaluation, events):
         conclusion += f' ML выявила {int(ml.sum())} необычных измерений, которые не обязательно означают лаги.'
         if int(ml_valid.sum()) < len(evaluation):
             conclusion += ' ML-предсказания доступны только для части измерений.'
-    if len(evaluation) and len(training) < 6:
+    if not saved_model and len(evaluation) and len(training) < 6:
         conclusion += ' Обучающих измерений недостаточно для содержательной интерпретации ML; технический минимум — 6, он не гарантирует репрезентативность.'
     if warnings and ml.any():
         conclusion += ' Покрытие режимов онлайна в TRAIN и TEST различается; это может влиять на интерпретацию ML-меток.'
     return dict(performance_events=count, ml=_metric(int(ml.sum()), int(ml_valid.sum())),
                 statistical=_metric(int(stat.sum()), int(stat_valid.sum())),
                 both=int((ml & stat).sum()), unique=int((ml | stat).sum()),
-                train_measurements=len(training), test_measurements=len(evaluation),
+                train_measurements=None if saved_model else len(training),
+                test_measurements=None if saved_model else len(evaluation),
                 coverage=coverage, coverage_warnings=warnings,
                 weak_coverage_percent=WEAK_COVERAGE_PERCENT, conclusion=conclusion)

@@ -5,9 +5,13 @@ import numpy as np
 import pandas as pd
 
 REQUIRED = ["timestamp_utc", "elapsed_ms", "mspt_avg", "players_online", "tps_1m"]
+CSV_V2_COLUMNS = frozenset(REQUIRED + [
+    "jvm_heap_used_bytes", "loaded_chunks", "entities_total", "block_entities_total",
+    "jvm_heap_committed_bytes", "gc_collection_count", "gc_collection_time_ms",
+])
 
 
-def load_data(csv_path: Path) -> pd.DataFrame:
+def load_data(csv_path: Path, *, allow_missing_model_metrics=False, require_v2=False) -> pd.DataFrame:
     with open(csv_path, encoding="utf-8-sig", newline="") as stream:
         reader = csv.reader(stream)
         header = next(reader, [])
@@ -17,7 +21,7 @@ def load_data(csv_path: Path) -> pd.DataFrame:
             if len(row) != len(header) or row == header:
                 raise ValueError(f"{csv_path}: malformed CSV record {number}")
     df = pd.read_csv(csv_path)
-    missing = set(REQUIRED) - set(df.columns)
+    missing = (CSV_V2_COLUMNS if require_v2 else set(REQUIRED)) - set(df.columns)
     if missing:
         raise ValueError(f"{csv_path}: missing columns: {', '.join(sorted(missing))}")
 
@@ -32,7 +36,8 @@ def load_data(csv_path: Path) -> pd.DataFrame:
 
     for column in REQUIRED[1:]:
         df[column] = pd.to_numeric(df[column], errors="raise")
-        if not np.isfinite(df[column].to_numpy(dtype=float)).all():
+        values = df[column].dropna() if allow_missing_model_metrics and column != "elapsed_ms" else df[column]
+        if not np.isfinite(values.to_numpy(dtype=float)).all():
             raise ValueError(f"{csv_path}: {column} contains missing or non-finite values")
 
     if (df[REQUIRED[1:]] < 0).any().any():
@@ -45,7 +50,7 @@ def load_data(csv_path: Path) -> pd.DataFrame:
             if not np.isfinite(df[column]).all() or (df[column] < minimum).any():
                 raise ValueError(f"{csv_path}: invalid {column}")
     counts = [c for c in df if c not in {"timestamp_utc", "mspt_avg", "tps_1m"}]
-    if any((df[c] % 1 != 0).any() for c in counts):
+    if any((df[c].dropna() % 1 != 0).any() for c in counts):
         raise ValueError(f"{csv_path}: fractional counter")
     if (df["timestamp_utc"].diff().dt.total_seconds() < 0).any():
         raise ValueError(f"{csv_path}: timestamps are out of order; data not sorted automatically")

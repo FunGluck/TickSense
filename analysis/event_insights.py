@@ -65,8 +65,10 @@ def summarize(df, positions):
 def build_insights(df, *, elevated_mspt=ELEVATED_MSPT, high_mspt=HIGH_MSPT, low_tps=LOW_TPS, max_gap_seconds=30):
     if not 0 <= elevated_mspt < high_mspt or low_tps < 0 or max_gap_seconds <= 0:
         raise ValueError('Invalid insight thresholds')
-    masks = dict(high_mspt=df.mspt_avg.ge(high_mspt),
-                 elevated_mspt=df.mspt_avg.ge(elevated_mspt) & df.mspt_avg.lt(high_mspt), low_tps=df.tps_1m.lt(low_tps))
+    valid = np.isfinite(df.mspt_avg) & np.isfinite(df.tps_1m)
+    masks = dict(high_mspt=valid & df.mspt_avg.ge(high_mspt),
+                 elevated_mspt=valid & df.mspt_avg.ge(elevated_mspt) & df.mspt_avg.lt(high_mspt),
+                 low_tps=valid & df.tps_1m.lt(low_tps))
     displayed = []
     for signal, mask in masks.items():
         # Preserve per-file references for existing event cards/explanations.
@@ -82,7 +84,7 @@ def build_insights(df, *, elevated_mspt=ELEVATED_MSPT, high_mspt=HIGH_MSPT, low_
                     item['explanation']['observed_facts'][0]=fact
                     item['explanation']['description']=fact
                 displayed.append(item)
-    ml = df.get('ml_anomaly',pd.Series(False,index=df.index)).eq(True)
+    ml = df.get('ml_anomaly',pd.Series(False,index=df.index)).eq(True).fillna(False)
     if 'anomaly_score' in df:
         ml &= np.isfinite(pd.to_numeric(df.anomaly_score,errors='coerce'))
     episodes=[]

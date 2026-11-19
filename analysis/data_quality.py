@@ -10,9 +10,10 @@ else:
 MAX_GAP_SECONDS = 30
 
 
-def load_period(paths):
+def load_period(paths, *, allow_missing_model_metrics=False, require_v2=False):
     """Read files in supplied order; midnight is not a server restart."""
-    frames = [load_data(Path(path)) for path in paths]
+    frames = [load_data(Path(path), allow_missing_model_metrics=allow_missing_model_metrics,
+                        require_v2=require_v2) for path in paths]
     if not frames:
         raise ValueError("Не указаны CSV")
     schema = set(frames[0])

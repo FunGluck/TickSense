@@ -35,6 +35,17 @@ get('reset').listeners.click();assert.equal(run('hi-lo'),30000);
 get('mspt').listeners.wheel({preventDefault(){},clientX:450,deltaY:-1});assert.equal(run('hi-lo'),22500);
 get('mspt').listeners.pointermove({clientX:400,clientY:150});assert.equal(get('tooltip').hidden,false);assert.match(get('tooltip').textContent,/UTC/);
 function content(n){return n.textContent+' '+n.children.map(content).join(' ');}
+run(`
+  data.ml_model={model_type:'IsolationForest',version:'synthetic-v1',trained_at_utc:points[0].timestamp_utc,
+                 server_id:'synthetic',training_measurements:48,evaluated_measurements:3,unscored_measurements:1};
+  $('period-scope').replaceChildren();
+  $('training-coverage').replaceChildren();
+  renderInterpretation();
+`);
+assert.match(content(get('period-scope')),/Сохранённая ML-модель/);
+assert.doesNotMatch(content(get('period-scope')),/TRAIN|TEST/);
+assert.match(content(get('training-coverage')),/synthetic-v1.*synthetic.*48.*3.*1/);
+run(`delete data.ml_model;`);
 const ui=Object.entries(nodes).filter(([id])=>id!=='report-data').map(([,n])=>content(n)).join(' ');
 for(const word of ['high_mspt','gc_time_delta_ms','Measurements','No events','score','undefined'])assert.ok(!ui.includes(word),word);
 get('mspt').listeners.pointermove({clientX:run('plotInfo.mspt.x(time(points[1]))'),clientY:run('plotInfo.mspt.y(points[1].mspt_avg)')});assert.match(get('tooltip').textContent,/Превышение: 0,33 мс/);assert.match(get('tooltip').textContent,/Необычные изменения/);
